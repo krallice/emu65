@@ -121,6 +121,16 @@ void dump_core_state(core_t *core) {
 	printf("Stack Pointer:\t\t0x%.4x\n", core->sp);
 }
 
+void instr_ldx(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
+	core->x = addr_mode(core);
+	++(core->pc);
+}
+
+void instr_ldy(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
+	core->y = addr_mode(core);
+	++(core->pc);
+}
+
 void exec_core(core_t *core) {
 
 	while ( core->ram[core->pc] != 0xFF ) {
@@ -129,18 +139,15 @@ void exec_core(core_t *core) {
 			// LDX:
 
 			case LDX_I:
-				core->x = addr_immediate(core);
-				++(core->pc);
+				instr_ldx(core, addr_immediate);
 				break;
 
 			case LDX_ZPG:
-				core->x = addr_zeropage(core);
-				++(core->pc);
+				instr_ldx(core, addr_zeropage);
 				break;
 
 			case LDX_ZPG_Y:
-				core->x = addr_zeropage_y(core);
-				++(core->pc);
+				instr_ldx(core, addr_zeropage_y);
 				break;
 
 			//////////////////////////////////////
@@ -148,18 +155,15 @@ void exec_core(core_t *core) {
 			// LDY:
 
 			case LDY_I:
-				core->y = addr_immediate(core);
-				++(core->pc);
+				instr_ldy(core, addr_immediate);
 				break;
 
 			case LDY_ZPG:
-				core->y = addr_zeropage(core);
-				++(core->pc);
+				instr_ldy(core, addr_zeropage);
 				break;
 
 			case LDY_ZPG_X:
-				core->y = addr_zeropage_x(core);
-				++(core->pc);
+				instr_ldy(core, addr_zeropage_x);
 				break;
 
 			//////////////////////////////////////
