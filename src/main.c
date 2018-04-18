@@ -3,14 +3,11 @@
 #include <string.h>
 #include <stdint.h>
 
+// Initialisation Macros:
 #define CORE_RAM_SIZE 0xFFFF
 #define CORE_OPCODE_SIZE 0xFF
 
-#define TOGGLE_CARRY(x) (x->fcarry = ~(x->fcarry))
-#define TOGGLE_ZERO(x) (x->fzero = ~(x->fzero))
-#define TOGGLE_OVERFLOW(x) (x->foverflow = ~(x->foverflow))
-#define TOGGLE_SIGN(x) (x->fsign = ~(x->fsign))
-
+// OPCODE Macros:
 #define LDX_I		0xA2
 #define LDX_ZPG 	0xA6
 #define LDX_ZPG_Y	0xB6
@@ -23,9 +20,7 @@
 #define LDY_A 		0xAC
 #define LDY_A_X		0xBC
 
-struct opcode_t;
-
-// Struct for the 6502 CPU:
+// Struct for our 6502 CPU Core:
 typedef struct core_t {
 
         // 16bit Program Counter:
@@ -52,7 +47,8 @@ typedef struct core_t {
 
 } core_t;
 
-// Addressing Modes:
+// Memory Addressing Modes:
+// Each have a difference method of returning an 8bit value:
 uint8_t addr_accumulator(core_t *core) {
 	return core->a;
 }
@@ -107,6 +103,7 @@ core_t *init_core() {
 	return core;
 }
 
+// Debugging:
 void dump_core_state(core_t *core) {
 	printf("Register A (Accumulator): 0x%.2x\n", core->a);
 
@@ -121,6 +118,8 @@ void dump_core_state(core_t *core) {
 	printf("Stack Pointer:\t\t0x%.4x\n", core->sp);
 }
 
+
+// Flag Operations:
 static inline void set_fzero(core_t *core, uint8_t *val) {
 	core->fzero = (*val == 0) ? 1 : 0;
 }
@@ -129,6 +128,9 @@ static inline void set_fsign(core_t *core, uint8_t *val) {
 	core->fsign = (*val & (0x01 << 7)) ? 1 : 0;
 }
 
+// Instructions:
+// Each instruction supports multiple memory addressing modes, passed as a function pointer,
+// dispatched by the relevant opcode case in the master switch table.
 static inline void instr_lda(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
 	core->a = addr_mode(core);
 	set_fzero(core, &(core->a));
@@ -150,12 +152,15 @@ static inline void instr_ldy(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
 	++(core->pc);
 }
 
+// Main excecution cycle and instruction dispatch table:
 void exec_core(core_t *core) {
 
+	// 0xFF is our Temp Quit Value
+	// Scaffolding for building the core:
 	while ( core->ram[core->pc] != 0xFF ) {
 		switch ( core->ram[core->pc] ) {
 
-			// LDX:
+			// LDX //
 			case LDX_I:
 				instr_ldx(core, addr_immediate);
 				break;
@@ -168,15 +173,15 @@ void exec_core(core_t *core) {
 				instr_ldx(core, addr_zeropage_y);
 				break;
 
-			case LDX_ZPG_A:
+			case LDX_A:
 				instr_ldx(core, addr_absolute);
 				break;
 
-			case LDX_ZPG_A_Y:
+			case LDX_A_Y:
 				instr_ldx(core, addr_absolute_y);
 				break;
 
-			// LDY:
+			// LDY //
 			case LDY_I:
 				instr_ldy(core, addr_immediate);
 				break;
@@ -189,11 +194,11 @@ void exec_core(core_t *core) {
 				instr_ldy(core, addr_zeropage_x);
 				break;
 
-			case LDY_ZPG_A:
+			case LDY_A:
 				instr_ldy(core, addr_absolute);
 				break;
 
-			case LDX_ZPG_A_X:
+			case LDY_A_X:
 				instr_ldy(core, addr_absolute_x);
 				break;
 
