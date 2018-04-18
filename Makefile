@@ -8,7 +8,7 @@ SRCDIR=src
 BINDIR=bin
 OBJDIR=obj
 
-TARGET=sap1emu
+TARGET=nesblue
 
 SOURCES  := $(wildcard $(SRCDIR)/*.c)
 INCLUDES := $(wildcard $(SRCDIR)/*.h)
