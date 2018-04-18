@@ -121,13 +121,32 @@ void dump_core_state(core_t *core) {
 	printf("Stack Pointer:\t\t0x%.4x\n", core->sp);
 }
 
-void instr_ldx(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
-	core->x = addr_mode(core);
+static inline void set_fzero(core_t *core, uint8_t *val) {
+	core->fzero = (*val == 0) ? 1 : 0;
+}
+
+static inline void set_fsign(core_t *core, uint8_t *val) {
+	core->fsign = (*val & (0x01 << 7)) ? 1 : 0;
+}
+
+static inline void instr_lda(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
+	core->a = addr_mode(core);
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
 	++(core->pc);
 }
 
-void instr_ldy(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
+static inline void instr_ldx(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
+	core->x = addr_mode(core);
+	set_fzero(core, &(core->x));
+	set_fsign(core, &(core->x));
+	++(core->pc);
+}
+
+static inline void instr_ldy(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
 	core->y = addr_mode(core);
+	set_fzero(core, &(core->y));
+	set_fsign(core, &(core->y));
 	++(core->pc);
 }
 
@@ -137,7 +156,6 @@ void exec_core(core_t *core) {
 		switch ( core->ram[core->pc] ) {
 
 			// LDX:
-
 			case LDX_I:
 				instr_ldx(core, addr_immediate);
 				break;
@@ -150,10 +168,15 @@ void exec_core(core_t *core) {
 				instr_ldx(core, addr_zeropage_y);
 				break;
 
-			//////////////////////////////////////
+			case LDX_ZPG_A:
+				instr_ldx(core, addr_absolute);
+				break;
+
+			case LDX_ZPG_A_Y:
+				instr_ldx(core, addr_absolute_y);
+				break;
 
 			// LDY:
-
 			case LDY_I:
 				instr_ldy(core, addr_immediate);
 				break;
@@ -166,7 +189,13 @@ void exec_core(core_t *core) {
 				instr_ldy(core, addr_zeropage_x);
 				break;
 
-			//////////////////////////////////////
+			case LDY_ZPG_A:
+				instr_ldy(core, addr_absolute);
+				break;
+
+			case LDX_ZPG_A_X:
+				instr_ldy(core, addr_absolute_x);
+				break;
 
 			default:
 				++(core->pc);
