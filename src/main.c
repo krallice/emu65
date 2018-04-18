@@ -50,15 +50,7 @@ typedef struct core_t {
 	// RAM:
 	uint8_t *ram;
 
-	// Opcode Table:
-	struct opcode_t *opcode;
-
 } core_t;
-
-// Opcode Struct:
-typedef struct opcode_t {
-	uint8_t (*addrmode)(core_t *core); // Addressing Mode
-} opcode_t;
 
 // Addressing Modes:
 uint8_t addr_accumulator(core_t *core) {
@@ -103,13 +95,6 @@ uint8_t addr_absolute_y(core_t *core) {
 // Todo: addr_indirect_x(core_t *core)
 // Todo: addr_indirect_y(core_t *core)
 
-// Initialise the opcode table:
-void init_opcode_table(core_t *core) {
-	core->opcode[0].addrmode = addr_accumulator;
-	core->opcode[1].addrmode = addr_immediate;
-	core->opcode[2].addrmode = addr_zeropage;
-}
-
 // Initialise the 6502 core:
 core_t *init_core() {
 
@@ -119,11 +104,6 @@ core_t *init_core() {
 	core->ram = (uint8_t*)malloc(sizeof(uint8_t)*CORE_RAM_SIZE);
 	memset(core->ram, 0, sizeof(uint8_t)*CORE_RAM_SIZE);
 
-	core->opcode = (opcode_t*)malloc(sizeof(opcode_t*)*CORE_OPCODE_SIZE);
-	memset(core->opcode, 0, sizeof(opcode_t*)*CORE_OPCODE_SIZE);
-
-	init_opcode_table(core);
-	
 	return core;
 }
 
