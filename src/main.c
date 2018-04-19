@@ -8,6 +8,17 @@
 #define CORE_OPCODE_SIZE 0xFF
 
 // OPCODE Macros:
+
+// Load/Store:
+#define LDA_I		0xA9
+#define LDA_ZPG 	0xA5
+#define LDA_ZPG_X	0xB5
+#define LDA_A 		0xAD
+#define LDA_A_X		0xBD
+#define LDA_A_Y		0xB9
+#define LDA_IND_X	0xA1
+#define LDA_IND_Y	0xB1
+
 #define LDX_I		0xA2
 #define LDX_ZPG 	0xA6
 #define LDX_ZPG_Y	0xB6
@@ -87,9 +98,28 @@ uint8_t addr_absolute_y(core_t *core) {
 	return core->ram[((msb << 8) + lsb) + core->y];
 }
 
+uint8_t addr_indirect_x(core_t *core) {
+	// Our pointer to a memory address in the zero page (Modified by X):
+	uint16_t zpg = (0x00 << 8) + (core->ram[++(core->pc)] + core->x);
+
+	// Our address that the zero page pointer points to:
+	// Todo: Fix any potential roll over issues:
+	uint16_t ind_add = ((core->ram[zpg+1] << 8) + core->ram[zpg]);
+	return core->ram[ind_add];
+}
+
+uint8_t addr_indirect_y(core_t *core) {
+
+	// Our pointer to a memory address in the zero page:
+	uint16_t zpg = (0x00 << 8) + (core->ram[++(core->pc)]);
+
+	// Address located in Zero page which points to our final target (Modified by Y):
+	uint16_t ind_add = ((core->ram[zpg+1] << 8) + core->ram[zpg]);
+	ind_add += core->y;
+	return core->ram[ind_add];
+}
+
 // Todo: addr_relative(core_t *core)
-// Todo: addr_indirect_x(core_t *core)
-// Todo: addr_indirect_y(core_t *core)
 
 // Initialise the 6502 core:
 core_t *init_core() {
@@ -160,46 +190,66 @@ void exec_core(core_t *core) {
 	while ( core->ram[core->pc] != 0xFF ) {
 		switch ( core->ram[core->pc] ) {
 
-			// LDX //
+		// Load/Store:
+
+			// LDX:
 			case LDX_I:
 				instr_ldx(core, addr_immediate);
 				break;
-
 			case LDX_ZPG:
 				instr_ldx(core, addr_zeropage);
 				break;
-
 			case LDX_ZPG_Y:
 				instr_ldx(core, addr_zeropage_y);
 				break;
-
 			case LDX_A:
 				instr_ldx(core, addr_absolute);
 				break;
-
 			case LDX_A_Y:
 				instr_ldx(core, addr_absolute_y);
 				break;
 
-			// LDY //
+			// LDY:
 			case LDY_I:
 				instr_ldy(core, addr_immediate);
 				break;
-
 			case LDY_ZPG:
 				instr_ldy(core, addr_zeropage);
 				break;
-
 			case LDY_ZPG_X:
 				instr_ldy(core, addr_zeropage_x);
 				break;
-
 			case LDY_A:
 				instr_ldy(core, addr_absolute);
 				break;
-
 			case LDY_A_X:
 				instr_ldy(core, addr_absolute_x);
+				break;
+
+			// LDA:
+			case LDA_I:
+				instr_lda(core, addr_immediate);
+				break;
+			case LDA_ZPG:
+				instr_lda(core, addr_zeropage);
+				break;
+			case LDA_ZPG_X:
+				instr_lda(core, addr_zeropage_x);
+				break;
+			case LDA_A:
+				instr_lda(core, addr_absolute);
+				break;
+			case LDA_A_X:
+				instr_lda(core, addr_absolute_x);
+				break;
+			case LDA_A_Y:
+				instr_lda(core, addr_absolute_y);
+				break;
+			case LDA_IND_X:
+				instr_lda(core, addr_indirect_x);
+				break;
+			case LDA_IND_Y:
+				instr_lda(core, addr_indirect_y);
 				break;
 
 			default:
