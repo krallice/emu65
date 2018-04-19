@@ -47,6 +47,12 @@
 #define STY_ZPG_X	0x94
 #define STY_A		0x8C
 
+// Register Transfers:
+#define TAX		0xAA
+#define TAY		0xA8
+#define TXA		0x8A
+#define TYA		0x98
+
 // Struct for our 6502 CPU Core:
 typedef struct core_t {
 
@@ -189,6 +195,14 @@ static inline void instr_st(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(co
 	++(core->pc);
 }
 
+// Generic Register Transfer Function (TAX, TAY, TYA, TXA etc..):
+static inline void instr_t__(core_t *core, const uint8_t *src, uint8_t *dst) {
+	*dst = *src;
+	set_fzero(core, dst);
+	set_fsign(core, dst);
+	++(core->pc);
+}
+
 // Specific Load Functions for Registers:
 // todo: Probably no longer required
 static inline void instr_lda(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
@@ -327,6 +341,19 @@ void exec_core(core_t *core) {
 				instr_st(core, &(core->y), addr_absolute);
 				break;
 
+		// Register Transfers:
+			case TAX:
+				instr_t__(core, &(core->a), &(core->x));
+				break;
+			case TAY:
+				instr_t__(core, &(core->a), &(core->y));
+				break;
+			case TXA:
+				instr_t__(core, &(core->x), &(core->a));
+				break;
+			case TYA:
+				instr_t__(core, &(core->y), &(core->a));
+				break;
 
 
 			default:
