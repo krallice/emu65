@@ -44,7 +44,7 @@
 #define STX_A		0x8E
 
 #define STY_ZPG		0x84
-#define STY_ZPG_Z	0x94
+#define STY_ZPG_X	0x94
 #define STY_A		0x8C
 
 // Struct for our 6502 CPU Core:
@@ -76,63 +76,60 @@ typedef struct core_t {
 
 // Memory Addressing Modes:
 // Each have a difference method of returning an 8bit value:
-uint8_t addr_accumulator(core_t *core) {
-	return core->a;
+//uint16_t addr_accumulator(core_t *core) {
+	//return core->a;
+//}
+
+uint16_t addr_immediate(core_t *core) {
+	return ++(core->pc);
 }
 
-uint8_t addr_immediate(core_t *core) {
-	return core->ram[++(core->pc)];
+uint16_t addr_zeropage(core_t *core) {
+	return (0x00 << 8) + core->ram[++(core->pc)];
 }
 
-uint8_t addr_zeropage(core_t *core) {
-	return core->ram[(0x00 << 8) + core->ram[++(core->pc)]];
+uint16_t addr_zeropage_x(core_t *core) {
+	return (0x00 << 8) + core->ram[++(core->pc)] + core->x;
 }
 
-uint8_t addr_zeropage_x(core_t *core) {
-	return core->ram[(0x00 << 8) + core->ram[++(core->pc)] + core->x];
+uint16_t addr_zeropage_y(core_t *core) {
+	return (0x00 << 8) + core->ram[++(core->pc)] + core->y;
 }
 
-uint8_t addr_zeropage_y(core_t *core) {
-	return core->ram[(0x00 << 8) + core->ram[++(core->pc)] + core->y];
-}
-
-uint8_t addr_absolute(core_t *core) {
+uint16_t addr_absolute(core_t *core) {
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
-	return core->ram[(msb << 8) + lsb];
+	return (msb << 8) + lsb;
 }
 
-uint8_t addr_absolute_x(core_t *core) {
+uint16_t addr_absolute_x(core_t *core) {
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
-	return core->ram[((msb << 8) + lsb) + core->x];
+	return ((msb << 8) + lsb) + core->x;
 }
 
-uint8_t addr_absolute_y(core_t *core) {
+uint16_t addr_absolute_y(core_t *core) {
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
-	return core->ram[((msb << 8) + lsb) + core->y];
+	return ((msb << 8) + lsb) + core->y;
 }
 
-uint8_t addr_indirect_x(core_t *core) {
+uint16_t addr_indirect_x(core_t *core) {
 	// Our pointer to a memory address in the zero page (Modified by X):
 	uint16_t zpg = (0x00 << 8) + (core->ram[++(core->pc)] + core->x);
 
 	// Our address that the zero page pointer points to:
 	// Todo: Fix any potential roll over issues:
-	uint16_t ind_add = ((core->ram[zpg+1] << 8) + core->ram[zpg]);
-	return core->ram[ind_add];
+	return (core->ram[zpg+1] << 8) + core->ram[zpg];
 }
 
-uint8_t addr_indirect_y(core_t *core) {
+uint16_t addr_indirect_y(core_t *core) {
 
 	// Our pointer to a memory address in the zero page:
 	uint16_t zpg = (0x00 << 8) + (core->ram[++(core->pc)]);
 
 	// Address located in Zero page which points to our final target (Modified by Y):
-	uint16_t ind_add = ((core->ram[zpg+1] << 8) + core->ram[zpg]);
-	ind_add += core->y;
-	return core->ram[ind_add];
+	return ((core->ram[zpg+1] << 8) + core->ram[zpg]) + core->y;
 }
 
 // Todo: addr_relative(core_t *core)
@@ -179,31 +176,37 @@ static inline void set_fsign(core_t *core, uint8_t *val) {
 // dispatched by the relevant opcode case in the master switch table.
 
 // Generic Load Function:
-static inline void instr_ld(core_t *core, uint8_t *reg, uint8_t (*addr_mode)(core_t *core)) {
-	*reg = addr_mode(core);
+static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+	*reg = core->ram[addr_mode(core)];
 	set_fzero(core, reg);
 	set_fsign(core, reg);
 	++(core->pc);
 }
 
+// Generic Store Function:
+static inline void instr_st(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+	core->ram[addr_mode(core)] = *reg;
+	++(core->pc);
+}
+
 // Specific Load Functions for Registers:
 // todo: Probably no longer required
-static inline void instr_lda(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
-	core->a = addr_mode(core);
+static inline void instr_lda(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	core->a = core->ram[addr_mode(core)];
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
 }
 
-static inline void instr_ldx(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
-	core->x = addr_mode(core);
+static inline void instr_ldx(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	core->x = core->ram[addr_mode(core)];
 	set_fzero(core, &(core->x));
 	set_fsign(core, &(core->x));
 	++(core->pc);
 }
 
-static inline void instr_ldy(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
-	core->y = addr_mode(core);
+static inline void instr_ldy(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	core->y = core->ram[addr_mode(core)];
 	set_fzero(core, &(core->y));
 	set_fsign(core, &(core->y));
 	++(core->pc);
@@ -278,6 +281,53 @@ void exec_core(core_t *core) {
 			case LDA_IND_Y:
 				instr_ld(core, &(core->a), addr_indirect_y);
 				break;
+
+			// STA:
+			case STA_ZPG:
+				instr_st(core, &(core->a), addr_zeropage);
+				break;
+			case STA_ZPG_X:
+				instr_st(core, &(core->a), addr_zeropage_x);
+				break;
+			case STA_A:
+				instr_st(core, &(core->a), addr_absolute);
+				break;
+			case STA_A_X:
+				instr_st(core, &(core->a), addr_absolute_x);
+				break;
+			case STA_A_Y:
+				instr_st(core, &(core->a), addr_absolute_y);
+				break;
+			case STA_IND_X:
+				instr_st(core, &(core->a), addr_indirect_x);
+				break;
+			case STA_IND_Y:
+				instr_st(core, &(core->a), addr_indirect_y);
+				break;
+
+			// STX:
+			case STX_ZPG:
+				instr_st(core, &(core->x), addr_zeropage);
+				break;
+			case STX_ZPG_Y:
+				instr_st(core, &(core->x), addr_zeropage_y);
+				break;
+			case STX_A:
+				instr_st(core, &(core->x), addr_absolute);
+				break;
+
+			// STY:
+			case STY_ZPG:
+				instr_st(core, &(core->y), addr_zeropage);
+				break;
+			case STY_ZPG_X:
+				instr_st(core, &(core->y), addr_zeropage_x);
+				break;
+			case STY_A:
+				instr_st(core, &(core->y), addr_absolute);
+				break;
+
+
 
 			default:
 				++(core->pc);
