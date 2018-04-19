@@ -31,6 +31,22 @@
 #define LDY_A 		0xAC
 #define LDY_A_X		0xBC
 
+#define STA_ZPG		0x85
+#define STA_ZPG_X	0x95
+#define STA_A		0x8D
+#define STA_A_X		0x9D
+#define STA_A_Y		0x99
+#define STA_IND_X	0x81
+#define STA_IND_Y	0x91
+
+#define STX_ZPG		0x86
+#define STX_ZPG_Y	0x96
+#define STX_A		0x8E
+
+#define STY_ZPG		0x84
+#define STY_ZPG_Z	0x94
+#define STY_A		0x8C
+
 // Struct for our 6502 CPU Core:
 typedef struct core_t {
 
@@ -161,6 +177,17 @@ static inline void set_fsign(core_t *core, uint8_t *val) {
 // Instructions:
 // Each instruction supports multiple memory addressing modes, passed as a function pointer,
 // dispatched by the relevant opcode case in the master switch table.
+
+// Generic Load Function:
+static inline void instr_ld(core_t *core, uint8_t *reg, uint8_t (*addr_mode)(core_t *core)) {
+	*reg = addr_mode(core);
+	set_fzero(core, reg);
+	set_fsign(core, reg);
+	++(core->pc);
+}
+
+// Specific Load Functions for Registers:
+// todo: Probably no longer required
 static inline void instr_lda(core_t *core, uint8_t (*addr_mode)(core_t *core)) {
 	core->a = addr_mode(core);
 	set_fzero(core, &(core->a));
@@ -194,62 +221,62 @@ void exec_core(core_t *core) {
 
 			// LDX:
 			case LDX_I:
-				instr_ldx(core, addr_immediate);
+				instr_ld(core, &(core->x), addr_immediate);
 				break;
 			case LDX_ZPG:
-				instr_ldx(core, addr_zeropage);
+				instr_ld(core, &(core->x), addr_zeropage);
 				break;
 			case LDX_ZPG_Y:
-				instr_ldx(core, addr_zeropage_y);
+				instr_ld(core, &(core->x), addr_zeropage_y);
 				break;
 			case LDX_A:
-				instr_ldx(core, addr_absolute);
+				instr_ld(core, &(core->x), addr_absolute);
 				break;
 			case LDX_A_Y:
-				instr_ldx(core, addr_absolute_y);
+				instr_ld(core, &(core->x), addr_absolute_y);
 				break;
 
 			// LDY:
 			case LDY_I:
-				instr_ldy(core, addr_immediate);
+				instr_ld(core, &(core->y), addr_immediate);
 				break;
 			case LDY_ZPG:
-				instr_ldy(core, addr_zeropage);
+				instr_ld(core, &(core->y), addr_zeropage);
 				break;
 			case LDY_ZPG_X:
-				instr_ldy(core, addr_zeropage_x);
+				instr_ld(core, &(core->y), addr_zeropage_x);
 				break;
 			case LDY_A:
-				instr_ldy(core, addr_absolute);
+				instr_ld(core, &(core->y), addr_absolute);
 				break;
 			case LDY_A_X:
-				instr_ldy(core, addr_absolute_x);
+				instr_ld(core, &(core->y), addr_absolute_x);
 				break;
 
 			// LDA:
 			case LDA_I:
-				instr_lda(core, addr_immediate);
+				instr_ld(core, &(core->a), addr_immediate);
 				break;
 			case LDA_ZPG:
-				instr_lda(core, addr_zeropage);
+				instr_ld(core, &(core->a), addr_zeropage);
 				break;
 			case LDA_ZPG_X:
-				instr_lda(core, addr_zeropage_x);
+				instr_ld(core, &(core->a), addr_zeropage_x);
 				break;
 			case LDA_A:
-				instr_lda(core, addr_absolute);
+				instr_ld(core, &(core->a), addr_absolute);
 				break;
 			case LDA_A_X:
-				instr_lda(core, addr_absolute_x);
+				instr_ld(core, &(core->a), addr_absolute_x);
 				break;
 			case LDA_A_Y:
-				instr_lda(core, addr_absolute_y);
+				instr_ld(core, &(core->a), addr_absolute_y);
 				break;
 			case LDA_IND_X:
-				instr_lda(core, addr_indirect_x);
+				instr_ld(core, &(core->a), addr_indirect_x);
 				break;
 			case LDA_IND_Y:
-				instr_lda(core, addr_indirect_y);
+				instr_ld(core, &(core->a), addr_indirect_y);
 				break;
 
 			default:
