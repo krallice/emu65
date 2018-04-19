@@ -7,6 +7,10 @@
 #define CORE_RAM_SIZE 0xFFFF
 #define CORE_OPCODE_SIZE 0xFF
 
+#define CORE_STACK_PAGE 0x01
+#define CORE_STACK_SIZE 0xFF
+#define CORE_STACK_ADDRESS(X) ((CORE_STACK_PAGE << 8) + X->sp)
+
 // OPCODE Macros:
 
 // Load/Store:
@@ -53,6 +57,10 @@
 #define TXA		0x8A
 #define TYA		0x98
 
+// Stack Operations:
+
+#define TXS		0x9A
+
 // Struct for our 6502 CPU Core:
 typedef struct core_t {
 
@@ -67,7 +75,7 @@ typedef struct core_t {
         uint8_t y;
 
         // Stack Pointer:
-        uint16_t sp;
+        uint8_t sp;
 
         // Used Flags:
         uint8_t fcarry :1;
@@ -149,6 +157,8 @@ core_t *init_core() {
 	core->ram = (uint8_t*)malloc(sizeof(uint8_t)*CORE_RAM_SIZE);
 	memset(core->ram, 0, sizeof(uint8_t)*CORE_RAM_SIZE);
 
+	core->sp = 0x00;
+
 	return core;
 }
 
@@ -165,6 +175,7 @@ void dump_core_state(core_t *core) {
 
 	printf("Program Counter:\t0x%.4x\n", core->pc);
 	printf("Stack Pointer:\t\t0x%.4x\n", core->sp);
+	printf("Stack Pointer Value:\t\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core)]);
 }
 
 
@@ -355,6 +366,10 @@ void exec_core(core_t *core) {
 				instr_t__(core, &(core->y), &(core->a));
 				break;
 
+		// Stack Operations:
+			case TXS:
+				instr_t__(core, &(core->x), &(core->ram[CORE_STACK_ADDRESS(core)]));
+				break;
 
 			default:
 				++(core->pc);
@@ -367,15 +382,15 @@ int main(void) {
 
 	core_t *core = init_core();
 
-	core->ram[0x0000] = LDX_I; //LDX_I
+	core->ram[0x0000] = LDX_ZPG;
 	core->ram[0x0001] = 0xCC;
 
-	core->ram[0x0002] = LDY_ZPG;
-	core->ram[0x0003] = 0xCC;
+	core->ram[0x0002] = TXS;
+	core->ram[0x0003] = 0xFF;
 
 	core->ram[0x0004] = 0xFF; // Exit
 
-	core->ram[0x00CC] = 0x0E;
+	core->ram[0x00CC] = 0xEE;
 
 	exec_core(core);
 	
