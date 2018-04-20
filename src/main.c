@@ -58,8 +58,8 @@
 #define TYA		0x98
 
 // Stack Operations:
-
 #define TXS		0x9A
+#define TSX		0xBA
 
 // Struct for our 6502 CPU Core:
 typedef struct core_t {
@@ -369,6 +369,10 @@ void exec_core(core_t *core) {
 		// Stack Operations:
 			case TXS:
 				instr_t__(core, &(core->x), &(core->ram[CORE_STACK_ADDRESS(core)]));
+				break;
+
+			case TSX:
+				instr_t__(core, &(core->ram[CORE_STACK_ADDRESS(core)]), &(core->x));
 				break;
 
 			default:
