@@ -7,11 +7,29 @@
 #define CORE_RAM_SIZE 0xFFFF
 #define CORE_OPCODE_SIZE 0xFF
 
+// Stack Macros:
 #define CORE_STACK_PAGE 0x01
 #define CORE_STACK_SIZE 0xFF
 #define CORE_STACK_ADDRESS(X) ((CORE_STACK_PAGE << 8) + X->sp)
 
-// OPCODE Macros:
+// Flag Macros:
+#define FLAG_CARRY	0x01
+#define FLAG_ZERO	0x02
+#define FLAG_INTDIS	0x04 // Interrupt Disable
+#define FLAG_DEC	0x08 // (Unused)
+#define FLAG_VECT	0x10 // Clear if Interrupt Vectoring, set if BRK or PHP
+#define FLAG_ALWAYS	0x20 // Always Set (Unused)
+#define FLAG_OVERFLOW	0x40	
+#define FLAG_SIGN	0x80
+
+#define GET_FLAG_CARRY(X) ((X->f & FLAG_CARRY) == FLAG_CARRY)
+#define GET_FLAG_ZERO(X) ((X->f & FLAG_ZERO) == FLAG_ZERO)
+#define GET_FLAG_INTDIS(X) ((X->f & FLAG_INTDIS) == FLAG_INTDIS)
+#define GET_FLAG_VECT(X) ((X->f & FLAG_VECT) == FLAG_VECT)
+#define GET_FLAG_OVERFLOW(X) ((X->f & FLAG_OVERFLOW) == FLAG_OVERFLOW)
+#define GET_FLAG_SIGN(X) ((X->f & FLAG_SIGN) == FLAG_SIGN)
+
+// Opcode Macros:
 
 // Load/Store:
 #define LDA_I		0xA9
@@ -57,9 +75,14 @@
 #define TXA		0x8A
 #define TYA		0x98
 
+// todo: implement:
 // Stack Operations:
-#define TXS		0x9A
-#define TSX		0xBA
+#define TXS		0x9A // Transfer value of X to Stack
+#define TSX		0xBA // Transfer value on Stack to X
+#define PHA		0x48 // Push the value of A onto Stack
+#define PHP		0x08 // Push the value of the Processor Status onto the Stack
+#define PLA		0x68 // Pull the value of the Stack onto A
+#define PLP		0x28 // Pull the value of the Stack onto the Processor Status
 
 // Struct for our 6502 CPU Core:
 typedef struct core_t {
@@ -82,6 +105,9 @@ typedef struct core_t {
         uint8_t fzero :1;
         uint8_t foverflow :1;
         uint8_t fsign :1;
+
+	uint8_t flags;
+	uint8_t f;
 
 	// RAM:
 	uint8_t *ram;
@@ -169,9 +195,9 @@ void dump_core_state(core_t *core) {
 	printf("Register X:\t\t0x%.2x\n", core->x);
 	printf("Register Y:\t\t0x%.2x\n", core->y);
 
-	printf("Zero Flag:\t\t%d\n",  core->fzero);
-	printf("Sign Flag:\t\t%d\n",  core->fsign);
-	printf("Carry Flag:\t\t%d\n", core->fcarry);
+	printf("Zero Flag:\t\t%d\n",  GET_FLAG_ZERO(core));
+	printf("Sign Flag:\t\t%d\n",  GET_FLAG_SIGN(core));
+	printf("Carry Flag:\t\t%d\n", GET_FLAG_CARRY(core));
 
 	printf("Program Counter:\t0x%.4x\n", core->pc);
 	printf("Stack Pointer:\t\t0x%.4x\n", core->sp);
@@ -181,11 +207,11 @@ void dump_core_state(core_t *core) {
 
 // Flag Operations:
 static inline void set_fzero(core_t *core, uint8_t *val) {
-	core->fzero = (*val == 0) ? 1 : 0;
+	(*val == 0) ? (core->f |= FLAG_ZERO) : (core->f &= ~FLAG_ZERO);
 }
 
 static inline void set_fsign(core_t *core, uint8_t *val) {
-	core->fsign = (*val & (0x01 << 7)) ? 1 : 0;
+	(*val & (0x01 << 7)) ? (core->f |= FLAG_SIGN) : (core->f &= ~FLAG_SIGN);
 }
 
 // Instructions:
@@ -394,7 +420,7 @@ int main(void) {
 
 	core->ram[0x0004] = 0xFF; // Exit
 
-	core->ram[0x00CC] = 0xEE;
+	core->ram[0x00CC] = 0x00;
 
 	exec_core(core);
 	
