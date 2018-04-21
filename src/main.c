@@ -84,6 +84,16 @@
 #define PLA		0x68 // Pull the value of the Stack onto A
 #define PLP		0x28 // Pull the value of the Stack onto the Processor Status
 
+// Arithmetic
+#define ADC_I		0x69
+#define ADC_ZPG		0x65
+#define ADC_ZPG_X	0x75
+#define ADC_A		0x6D
+#define ADC_A_X		0x7D
+#define ADC_A_Y		0x79
+#define ADC_IND_X	0x61
+#define ADC_IND_Y	0x71
+
 // Struct for our 6502 CPU Core:
 typedef struct core_t {
 
@@ -198,12 +208,12 @@ void dump_core_state(core_t *core) {
 	printf("Zero Flag:\t\t%d\n",  GET_FLAG_ZERO(core));
 	printf("Sign Flag:\t\t%d\n",  GET_FLAG_SIGN(core));
 	printf("Carry Flag:\t\t%d\n", GET_FLAG_CARRY(core));
+	printf("Overflow Flag:\t\t%d\n", GET_FLAG_OVERFLOW(core));
 
 	printf("Program Counter:\t0x%.4x\n", core->pc);
 	printf("Stack Pointer:\t\t0x%.4x\n", core->sp);
 	printf("Stack Pointer Value:\t\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core)]);
 }
-
 
 // Flag Operations:
 static inline void set_fzero(core_t *core, uint8_t *val) {
@@ -212,6 +222,13 @@ static inline void set_fzero(core_t *core, uint8_t *val) {
 
 static inline void set_fsign(core_t *core, uint8_t *val) {
 	(*val & (0x01 << 7)) ? (core->f |= FLAG_SIGN) : (core->f &= ~FLAG_SIGN);
+}
+
+static inline void set_foverflow(core_t *core, uint8_t *a, uint8_t *b, uint8_t *sum) {
+	// ~(a + b) == If the sign bits were the same (inverse of XOR)
+	// & (a ^ sum) == If the sign bits of a+b were different
+	// & 0x80 mask off the highest bit:
+	((~(*a ^ *b)) & (*a ^ *sum) & 0x80) ? (core->f |= FLAG_OVERFLOW) : (core->f &= ~FLAG_OVERFLOW);
 }
 
 // Instructions:
@@ -239,6 +256,23 @@ static inline void instr_t__(core_t *core, const uint8_t *src, uint8_t *dst) {
 	set_fsign(core, dst);
 	++(core->pc);
 }
+
+// Specific ADC Funtion:
+static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+
+	// Set Overflow:
+	uint8_t addition = core->a + core->ram[addr_mode(core)] + (uint8_t)(GET_FLAG_CARRY(core));
+	uint8_t sum = core->a + addition;
+	set_foverflow(core, &(core->a), &addition, &sum);
+
+	// Set Accumulator
+	core->a = sum;
+
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
+	++(core->pc);
+}
+
 
 // Specific Load Functions for Registers:
 // todo: Probably no longer required
@@ -399,6 +433,33 @@ void exec_core(core_t *core) {
 
 			case TSX:
 				instr_t__(core, &(core->ram[CORE_STACK_ADDRESS(core)]), &(core->x));
+				break;
+
+		// Arithmetic Operations:
+
+			case ADC_I:
+				instr_adc(core, addr_immediate);
+				break;
+			case ADC_ZPG:
+				instr_adc(core, addr_zeropage);
+				break;
+			case ADC_ZPG_X:
+				instr_adc(core, addr_zeropage_x);
+				break;
+			case ADC_A:
+				instr_adc(core, addr_absolute);
+				break;
+			case ADC_A_X:
+				instr_adc(core, addr_absolute_x);
+				break;
+			case ADC_A_Y:
+				instr_adc(core, addr_absolute_y);
+				break;
+			case ADC_IND_X:
+				instr_adc(core, addr_indirect_x);
+				break;
+			case ADC_IND_Y:
+				instr_adc(core, addr_indirect_y);
 				break;
 
 			default:
