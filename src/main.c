@@ -87,6 +87,19 @@
 #define ADC_IND_X	0x61
 #define ADC_IND_Y	0x71
 
+// Increment/Decrements:
+#define INC_ZPG		0xE6
+#define INC_ZPG_X	0xF6
+#define INC_A		0xEE
+#define INC_A_X		0xFE
+
+#define INX		0xE8
+#define INY		0xC8
+
+#define DEC		0xDE
+#define DEX		0xCA
+#define DEY		0x88
+
 // Flag Sets/Clears
 #define CLC		0x18
 #define CLI		0x58
@@ -241,6 +254,8 @@ static inline void set_foverflow(core_t *core, uint8_t *a, uint8_t *b, uint8_t *
 // Each instruction supports multiple memory addressing modes, passed as a function pointer,
 // dispatched by the relevant opcode case in the master switch table.
 
+// Generic Instruction Implementations:
+
 // Generic Load Function:
 static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
 	*reg = core->ram[addr_mode(core)];
@@ -263,6 +278,41 @@ static inline void instr_t__(core_t *core, const uint8_t *src, uint8_t *dst) {
 	++(core->pc);
 }
 
+// Generic Register Address Increment Function:
+static inline void instr_in_(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+	++(*reg);
+	set_fzero(core, reg);
+	set_fsign(core, reg);
+	++(core->pc);
+}
+
+// Generic Register Address Decrement Function:
+static inline void instr_de_(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+	--(*reg);
+	set_fzero(core, reg);
+	set_fsign(core, reg);
+	++(core->pc);
+}
+
+// Specific Instruction Implementations:
+
+// Specific Memory Address Increment Function:
+static inline void instr_inc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	uint8_t newval = ++(core->ram[addr_mode(core)]);
+	set_fzero(core, &(newval));
+	set_fsign(core, &(newval));
+	++(core->pc);
+}
+
+// Specific Memory Address Decrement Function:
+static inline void instr_dec(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	uint8_t newval = --(core->ram[addr_mode(core)]);
+	set_fzero(core, &(newval));
+	set_fsign(core, &(newval));
+	++(core->pc);
+}
+
+
 // Specific ADC Funtion:
 static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
@@ -279,9 +329,9 @@ static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	++(core->pc);
 }
 
-
 // Specific Load Functions for Registers:
 // todo: Probably no longer required
+/*
 static inline void instr_lda(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	core->a = core->ram[addr_mode(core)];
 	set_fzero(core, &(core->a));
@@ -302,6 +352,7 @@ static inline void instr_ldy(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	set_fsign(core, &(core->y));
 	++(core->pc);
 }
+*/
 
 // Main excecution cycle and instruction dispatch table:
 void exec_core(core_t *core) {
@@ -467,6 +518,35 @@ void exec_core(core_t *core) {
 				instr_adc(core, addr_indirect_y);
 				break;
 
+		// Increments/Decrements:
+			case INC_ZPG:
+				instr_inc(core, addr_zeropage);
+				break;
+			case INC_ZPG_X:
+				instr_inc(core, addr_zeropage_x);
+				break;
+			case INC_A:
+				instr_inc(core, addr_absolute);
+				break;
+			case INC_A_X:
+				instr_inc(core, addr_absolute_x);
+				break;
+			case INX:
+				instr_in_(core, &(core->x), addr_zeropage);
+				break;
+			case INY:
+				instr_in_(core, &(core->y), addr_zeropage);
+				break;
+			case DEC:
+				instr_dec(core, addr_zeropage);
+				break;
+			case DEX:
+				instr_de_(core, &(core->x), addr_zeropage);
+				break;
+			case DEY:
+				instr_de_(core, &(core->y), addr_zeropage);
+				break;
+
 		// Flag Sets and Clears:
 			case CLC:
 				core->fcarry = 0;
@@ -492,6 +572,7 @@ void exec_core(core_t *core) {
 			default:
 				++(core->pc);
 				break;
+
 		}
 	}
 }
@@ -504,11 +585,13 @@ int main(void) {
 	core->ram[0x0001] = 0xCC;
 
 	core->ram[0x0002] = TXS;
-	core->ram[0x0003] = 0xFF;
 
-	core->ram[0x0004] = 0xFF; // Exit
+	core->ram[0x0003] = INX;
+	core->ram[0x0004] = DEX;
+	core->ram[0x0005] = DEX;
+	core->ram[0x0006] = 0xFF;
 
-	core->ram[0x00CC] = 0x00;
+	core->ram[0x000F] = 0xFF; // Exit
 
 	exec_core(core);
 	
