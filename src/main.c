@@ -22,13 +22,6 @@
 #define FLAG_OVERFLOW	0x40	
 #define FLAG_SIGN	0x80
 
-#define GET_FLAG_CARRY(X) ((X->f & FLAG_CARRY) == FLAG_CARRY)
-#define GET_FLAG_ZERO(X) ((X->f & FLAG_ZERO) == FLAG_ZERO)
-#define GET_FLAG_INTDIS(X) ((X->f & FLAG_INTDIS) == FLAG_INTDIS)
-#define GET_FLAG_VECT(X) ((X->f & FLAG_VECT) == FLAG_VECT)
-#define GET_FLAG_OVERFLOW(X) ((X->f & FLAG_OVERFLOW) == FLAG_OVERFLOW)
-#define GET_FLAG_SIGN(X) ((X->f & FLAG_SIGN) == FLAG_SIGN)
-
 // Opcode Macros:
 
 // Load/Store:
@@ -94,6 +87,13 @@
 #define ADC_IND_X	0x61
 #define ADC_IND_Y	0x71
 
+// Flag Sets/Clears
+#define CLC		0x18
+#define CLI		0x58
+#define CLV		0xB8
+#define SEC		0x38
+#define SEI		0x78
+
 // Struct for our 6502 CPU Core:
 typedef struct core_t {
 
@@ -113,8 +113,12 @@ typedef struct core_t {
         // Used Flags:
         uint8_t fcarry :1;
         uint8_t fzero :1;
-        uint8_t foverflow :1;
+        uint8_t fintdisable :1;
+	uint8_t fdec :1; // Unused
+	uint8_t fvect :1; // Clear if Interrupt Vectoring, set if BPK or PHP
+	uint8_t falways :1; // Unused
         uint8_t fsign :1;
+        uint8_t foverflow :1;
 
 	uint8_t flags;
 	uint8_t f;
@@ -195,6 +199,8 @@ core_t *init_core() {
 
 	core->sp = 0x00;
 
+	core->falways = 1;
+
 	return core;
 }
 
@@ -205,10 +211,10 @@ void dump_core_state(core_t *core) {
 	printf("Register X:\t\t0x%.2x\n", core->x);
 	printf("Register Y:\t\t0x%.2x\n", core->y);
 
-	printf("Zero Flag:\t\t%d\n",  GET_FLAG_ZERO(core));
-	printf("Sign Flag:\t\t%d\n",  GET_FLAG_SIGN(core));
-	printf("Carry Flag:\t\t%d\n", GET_FLAG_CARRY(core));
-	printf("Overflow Flag:\t\t%d\n", GET_FLAG_OVERFLOW(core));
+	printf("Zero Flag:\t\t%d\n",  core->fzero);
+	printf("Sign Flag:\t\t%d\n",  core->fsign);
+	printf("Carry Flag:\t\t%d\n", core->fcarry);
+	printf("Overflow Flag:\t\t%d\n", core->foverflow);
 
 	printf("Program Counter:\t0x%.4x\n", core->pc);
 	printf("Stack Pointer:\t\t0x%.4x\n", core->sp);
@@ -217,18 +223,18 @@ void dump_core_state(core_t *core) {
 
 // Flag Operations:
 static inline void set_fzero(core_t *core, uint8_t *val) {
-	(*val == 0) ? (core->f |= FLAG_ZERO) : (core->f &= ~FLAG_ZERO);
+	core->fzero = (*val == 0) ? 1 : 0;
 }
 
 static inline void set_fsign(core_t *core, uint8_t *val) {
-	(*val & (0x01 << 7)) ? (core->f |= FLAG_SIGN) : (core->f &= ~FLAG_SIGN);
+	core->fsign = (*val & (0x01 << 7)) ? 1 : 0;
 }
 
 static inline void set_foverflow(core_t *core, uint8_t *a, uint8_t *b, uint8_t *sum) {
 	// ~(a + b) == If the sign bits were the same (inverse of XOR)
 	// & (a ^ sum) == If the sign bits of a+b were different
 	// & 0x80 mask off the highest bit:
-	((~(*a ^ *b)) & (*a ^ *sum) & 0x80) ? (core->f |= FLAG_OVERFLOW) : (core->f &= ~FLAG_OVERFLOW);
+	core->foverflow = ((~(*a ^ *b)) & (*a ^ *sum) & 0x80) ? 1 : 0;
 }
 
 // Instructions:
@@ -261,7 +267,7 @@ static inline void instr_t__(core_t *core, const uint8_t *src, uint8_t *dst) {
 static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
 	// Set Overflow:
-	uint8_t addition = core->a + core->ram[addr_mode(core)] + (uint8_t)(GET_FLAG_CARRY(core));
+	uint8_t addition = core->a + core->ram[addr_mode(core)] + core->fcarry;
 	uint8_t sum = core->a + addition;
 	set_foverflow(core, &(core->a), &addition, &sum);
 
@@ -436,7 +442,6 @@ void exec_core(core_t *core) {
 				break;
 
 		// Arithmetic Operations:
-
 			case ADC_I:
 				instr_adc(core, addr_immediate);
 				break;
@@ -460,6 +465,28 @@ void exec_core(core_t *core) {
 				break;
 			case ADC_IND_Y:
 				instr_adc(core, addr_indirect_y);
+				break;
+
+		// Flag Sets and Clears:
+			case CLC:
+				core->fcarry = 0;
+				++(core->pc);
+				break;
+			case CLI:
+				core->fintdisable = 0;
+				++(core->pc);
+				break;
+			case CLV:
+				core->foverflow = 0;
+				++(core->pc);
+				break;
+			case SEC:
+				core->fcarry = 1;
+				++(core->pc);
+				break;
+			case SEI:
+				core->fintdisable = 1;
+				++(core->pc);
 				break;
 
 			default:
