@@ -8,9 +8,10 @@
 #define CORE_OPCODE_SIZE 0xFF
 
 // Stack Macros:
-#define CORE_STACK_PAGE 0x01
-#define CORE_STACK_SIZE 0xFF
-#define CORE_STACK_ADDRESS(X) ((CORE_STACK_PAGE << 8) + X->sp)
+#define CORE_STACK_PAGE 0x01 // 1st Page for the Stack
+#define CORE_STACK_SIZE 0xFF // Size of the stack (0x0100 -> 0x01FF)
+#define CORE_STACK_POINTER_INIT 0xFF // Initial Address to init the SP to
+#define CORE_STACK_ADDRESS(X) ((CORE_STACK_PAGE << 8) + X->sp) // Return Full 2 Byte Stack Address (0x01XX)
 
 // Flag Macros:
 #define FLAG_CARRY	0x01
@@ -21,13 +22,6 @@
 #define FLAG_ALWAYS	0x20 // Always Set (Unused)
 #define FLAG_OVERFLOW	0x40	
 #define FLAG_SIGN	0x80
-
-#define GET_FLAG_CARRY(X) ((X->f & FLAG_CARRY) == FLAG_CARRY)
-#define GET_FLAG_ZERO(X) ((X->f & FLAG_ZERO) == FLAG_ZERO)
-#define GET_FLAG_INTDIS(X) ((X->f & FLAG_INTDIS) == FLAG_INTDIS)
-#define GET_FLAG_VECT(X) ((X->f & FLAG_VECT) == FLAG_VECT)
-#define GET_FLAG_OVERFLOW(X) ((X->f & FLAG_OVERFLOW) == FLAG_OVERFLOW)
-#define GET_FLAG_SIGN(X) ((X->f & FLAG_SIGN) == FLAG_SIGN)
 
 // Opcode Macros:
 
@@ -75,7 +69,6 @@
 #define TXA		0x8A
 #define TYA		0x98
 
-// todo: implement:
 // Stack Operations:
 #define TXS		0x9A // Transfer value of X to Stack
 #define TSX		0xBA // Transfer value on Stack to X
@@ -84,6 +77,38 @@
 #define PLA		0x68 // Pull the value of the Stack onto A
 #define PLP		0x28 // Pull the value of the Stack onto the Processor Status
 
+// Logical:
+#define AND_I		0x29
+#define AND_ZPG		0x25
+#define AND_ZPG_X	0x35
+#define AND_A		0x2D
+#define AND_A_X		0x3D
+#define AND_A_Y		0x39
+#define AND_IND_X	0x21
+#define AND_IND_Y	0x31
+
+#define EOR_I		0x49
+#define EOR_ZPG		0x45
+#define EOR_ZPG_X	0x55
+#define EOR_A		0x4D
+#define EOR_A_X		0x5D
+#define EOR_A_Y		0x59
+#define EOR_IND_X	0x41
+#define EOR_IND_Y	0x51
+
+#define ORA_I		0x09
+#define ORA_ZPG		0x05
+#define ORA_ZPG_X	0x15
+#define ORA_A		0x0D
+#define ORA_A_X		0x1D
+#define ORA_A_Y		0x19
+#define ORA_IND_X	0x01
+#define ORA_IND_Y	0x11
+
+#define BIT_ZPG		0x24 // todo
+#define BIT_A		0x2C // todo
+
+// todo: complete
 // Arithmetic
 #define ADC_I		0x69
 #define ADC_ZPG		0x65
@@ -93,6 +118,26 @@
 #define ADC_A_Y		0x79
 #define ADC_IND_X	0x61
 #define ADC_IND_Y	0x71
+
+// Increment/Decrements:
+#define INC_ZPG		0xE6
+#define INC_ZPG_X	0xF6
+#define INC_A		0xEE
+#define INC_A_X		0xFE
+
+#define INX		0xE8
+#define INY		0xC8
+
+#define DEC		0xDE
+#define DEX		0xCA
+#define DEY		0x88
+
+// Flag Sets/Clears
+#define CLC		0x18
+#define CLI		0x58
+#define CLV		0xB8
+#define SEC		0x38
+#define SEI		0x78
 
 // Struct for our 6502 CPU Core:
 typedef struct core_t {
@@ -113,8 +158,12 @@ typedef struct core_t {
         // Used Flags:
         uint8_t fcarry :1;
         uint8_t fzero :1;
-        uint8_t foverflow :1;
+        uint8_t fintdisable :1;
+	uint8_t fdec :1; // Unused
+	uint8_t fvect :1; // Clear if Interrupt Vectoring, set if BPK or PHP
+	uint8_t falways :1; // Unused
         uint8_t fsign :1;
+        uint8_t foverflow :1;
 
 	uint8_t flags;
 	uint8_t f;
@@ -193,7 +242,9 @@ core_t *init_core() {
 	core->ram = (uint8_t*)malloc(sizeof(uint8_t)*CORE_RAM_SIZE);
 	memset(core->ram, 0, sizeof(uint8_t)*CORE_RAM_SIZE);
 
-	core->sp = 0x00;
+	core->sp = CORE_STACK_POINTER_INIT;
+
+	core->falways = 1;
 
 	return core;
 }
@@ -205,35 +256,38 @@ void dump_core_state(core_t *core) {
 	printf("Register X:\t\t0x%.2x\n", core->x);
 	printf("Register Y:\t\t0x%.2x\n", core->y);
 
-	printf("Zero Flag:\t\t%d\n",  GET_FLAG_ZERO(core));
-	printf("Sign Flag:\t\t%d\n",  GET_FLAG_SIGN(core));
-	printf("Carry Flag:\t\t%d\n", GET_FLAG_CARRY(core));
-	printf("Overflow Flag:\t\t%d\n", GET_FLAG_OVERFLOW(core));
+	printf("Zero Flag:\t\t%d\n",  core->fzero);
+	printf("Sign Flag:\t\t%d\n",  core->fsign);
+	printf("Carry Flag:\t\t%d\n", core->fcarry);
+	printf("Overflow Flag:\t\t%d\n", core->foverflow);
 
 	printf("Program Counter:\t0x%.4x\n", core->pc);
-	printf("Stack Pointer:\t\t0x%.4x\n", core->sp);
+	printf("Stack Pointer:\t\t\t0x%.4x\n", core->sp);
 	printf("Stack Pointer Value:\t\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core)]);
+	printf("Prev Stack Pointer Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) + 1]);
 }
 
 // Flag Operations:
 static inline void set_fzero(core_t *core, uint8_t *val) {
-	(*val == 0) ? (core->f |= FLAG_ZERO) : (core->f &= ~FLAG_ZERO);
+	core->fzero = (*val == 0) ? 1 : 0;
 }
 
 static inline void set_fsign(core_t *core, uint8_t *val) {
-	(*val & (0x01 << 7)) ? (core->f |= FLAG_SIGN) : (core->f &= ~FLAG_SIGN);
+	core->fsign = (*val & (0x01 << 7)) ? 1 : 0;
 }
 
 static inline void set_foverflow(core_t *core, uint8_t *a, uint8_t *b, uint8_t *sum) {
 	// ~(a + b) == If the sign bits were the same (inverse of XOR)
 	// & (a ^ sum) == If the sign bits of a+b were different
 	// & 0x80 mask off the highest bit:
-	((~(*a ^ *b)) & (*a ^ *sum) & 0x80) ? (core->f |= FLAG_OVERFLOW) : (core->f &= ~FLAG_OVERFLOW);
+	core->foverflow = ((~(*a ^ *b)) & (*a ^ *sum) & 0x80) ? 1 : 0;
 }
 
 // Instructions:
 // Each instruction supports multiple memory addressing modes, passed as a function pointer,
 // dispatched by the relevant opcode case in the master switch table.
+
+// Generic Instruction Implementations:
 
 // Generic Load Function:
 static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
@@ -257,11 +311,116 @@ static inline void instr_t__(core_t *core, const uint8_t *src, uint8_t *dst) {
 	++(core->pc);
 }
 
+// Generic Register Address Increment Function:
+static inline void instr_in_(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+	++(*reg);
+	set_fzero(core, reg);
+	set_fsign(core, reg);
+	++(core->pc);
+}
+
+// Generic Register Address Decrement Function:
+static inline void instr_de_(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+	--(*reg);
+	set_fzero(core, reg);
+	set_fsign(core, reg);
+	++(core->pc);
+}
+
+// Specific Instruction Implementations:
+
+// Specific Memory Address Increment Function:
+static inline void instr_inc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	uint8_t newval = ++(core->ram[addr_mode(core)]);
+	set_fzero(core, &(newval));
+	set_fsign(core, &(newval));
+	++(core->pc);
+}
+
+// Specific Memory Address Decrement Function:
+static inline void instr_dec(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	uint8_t newval = --(core->ram[addr_mode(core)]);
+	set_fzero(core, &(newval));
+	set_fsign(core, &(newval));
+	++(core->pc);
+}
+
+// Specific Push onto Stack Operation:
+static inline void instr_pha(core_t *core) {
+	core->ram[CORE_STACK_ADDRESS(core)] = core->a;
+	--(core->sp); // Decrement Stack Pointer
+	++(core->pc);
+}
+
+// Specific Pull off the Stack
+static inline void instr_pla(core_t *core) {
+	++(core->sp);
+	core->a = core->ram[CORE_STACK_ADDRESS(core)];
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
+	++(core->pc);
+}
+
+// Specific Push Status onto Stack:
+static inline void instr_php(core_t *core) {
+
+	uint8_t status = 0x00;
+	status &= (core->fcarry 	<< 0);
+	status &= (core->fzero 		<< 1);
+	status &= (core->fintdisable 	<< 2);
+	status &= (core->fdec 		<< 3);
+	status &= (core->fvect 		<< 4);
+	status &= (core->falways	<< 5);
+	status &= (core->foverflow 	<< 6);
+	status &= (core->fsign		<< 7);
+
+	core->ram[CORE_STACK_ADDRESS(core)] = status;
+
+	--(core->sp); // Decrement Stack Pointer
+	++(core->pc);
+}
+
+// Specific Pull Status onto Stack:
+static inline void instr_plp(core_t *core) {
+
+	++(core->sp);
+	uint8_t status = core->ram[CORE_STACK_ADDRESS(core)];
+
+	core->fcarry = 		(status >> 0) ? 1: 0;
+	core->fzero = 		(status >> 1) ? 1: 0;
+	core->fintdisable = 	(status >> 2) ? 1: 0;
+	core->fdec = 		(status >> 3) ? 1: 0;
+	core->fvect =		(status >> 4) ? 1: 0;
+	core->falways =		(status >> 5) ? 1: 0;
+	core->foverflow = 	(status >> 6) ? 1: 0;
+	core->fsign =		(status >> 7) ? 1: 0;
+
+	++(core->pc);
+}
+
+// Specific Logical AND Operation:
+static inline void instr_and(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	core->a &= core->ram[addr_mode(core)];
+	++(core->pc);
+}
+
+// Specific Logical eXclusive OR Operation:
+static inline void instr_eor(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	core->a ^= core->ram[addr_mode(core)];
+	++(core->pc);
+}
+
+// Specific Logical OR Operation:
+static inline void instr_ora(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	core->a |= core->ram[addr_mode(core)];
+	++(core->pc);
+}
+
 // Specific ADC Funtion:
 static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
 	// Set Overflow:
-	uint8_t addition = core->a + core->ram[addr_mode(core)] + (uint8_t)(GET_FLAG_CARRY(core));
+	uint8_t addition = core->a + core->ram[addr_mode(core)] + core->fcarry;
 	uint8_t sum = core->a + addition;
 	set_foverflow(core, &(core->a), &addition, &sum);
 
@@ -273,9 +432,9 @@ static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	++(core->pc);
 }
 
-
 // Specific Load Functions for Registers:
 // todo: Probably no longer required
+/*
 static inline void instr_lda(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	core->a = core->ram[addr_mode(core)];
 	set_fzero(core, &(core->a));
@@ -296,6 +455,7 @@ static inline void instr_ldy(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	set_fsign(core, &(core->y));
 	++(core->pc);
 }
+*/
 
 // Main excecution cycle and instruction dispatch table:
 void exec_core(core_t *core) {
@@ -430,13 +590,23 @@ void exec_core(core_t *core) {
 			case TXS:
 				instr_t__(core, &(core->x), &(core->ram[CORE_STACK_ADDRESS(core)]));
 				break;
-
 			case TSX:
 				instr_t__(core, &(core->ram[CORE_STACK_ADDRESS(core)]), &(core->x));
 				break;
+			case PHA:
+				instr_pha(core);
+				break;
+			case PLA:
+				instr_pla(core);
+				break;
+			case PHP:
+				instr_php(core);
+				break;
+			case PLP:
+				instr_plp(core);
+				break;
 
 		// Arithmetic Operations:
-
 			case ADC_I:
 				instr_adc(core, addr_immediate);
 				break;
@@ -462,6 +632,133 @@ void exec_core(core_t *core) {
 				instr_adc(core, addr_indirect_y);
 				break;
 
+		// Logic Operations:
+			case AND_I:
+				instr_and(core, addr_immediate);
+				break;
+			case AND_ZPG:
+				instr_and(core, addr_zeropage);
+				break;
+			case AND_ZPG_X:
+				instr_and(core, addr_zeropage_x);
+				break;
+			case AND_A:
+				instr_and(core, addr_absolute);
+				break;
+			case AND_A_X:
+				instr_and(core, addr_absolute_x);
+				break;
+			case AND_A_Y:
+				instr_and(core, addr_absolute_y);
+				break;
+			case AND_IND_X:
+				instr_and(core, addr_indirect_x);
+				break;
+			case AND_IND_Y:
+				instr_and(core, addr_indirect_y);
+				break;
+
+			case EOR_I:
+				instr_eor(core, addr_immediate);
+				break;
+			case EOR_ZPG:
+				instr_eor(core, addr_zeropage);
+				break;
+			case EOR_ZPG_X:
+				instr_eor(core, addr_zeropage_x);
+				break;
+			case EOR_A:
+				instr_eor(core, addr_absolute);
+				break;
+			case EOR_A_X:
+				instr_eor(core, addr_absolute_x);
+				break;
+			case EOR_A_Y:
+				instr_eor(core, addr_absolute_y);
+				break;
+			case EOR_IND_X:
+				instr_eor(core, addr_indirect_x);
+				break;
+			case EOR_IND_Y:
+				instr_eor(core, addr_indirect_y);
+				break;
+
+			case ORA_I:
+				instr_ora(core, addr_immediate);
+				break;
+			case ORA_ZPG:
+				instr_ora(core, addr_zeropage);
+				break;
+			case ORA_ZPG_X:
+				instr_ora(core, addr_zeropage_x);
+				break;
+			case ORA_A:
+				instr_ora(core, addr_absolute);
+				break;
+			case ORA_A_X:
+				instr_ora(core, addr_absolute_x);
+				break;
+			case ORA_A_Y:
+				instr_ora(core, addr_absolute_y);
+				break;
+			case ORA_IND_X:
+				instr_ora(core, addr_indirect_x);
+				break;
+			case ORA_IND_Y:
+				instr_ora(core, addr_indirect_y);
+				break;
+
+		// Increments/Decrements:
+			case INC_ZPG:
+				instr_inc(core, addr_zeropage);
+				break;
+			case INC_ZPG_X:
+				instr_inc(core, addr_zeropage_x);
+				break;
+			case INC_A:
+				instr_inc(core, addr_absolute);
+				break;
+			case INC_A_X:
+				instr_inc(core, addr_absolute_x);
+				break;
+			case INX:
+				instr_in_(core, &(core->x), addr_zeropage);
+				break;
+			case INY:
+				instr_in_(core, &(core->y), addr_zeropage);
+				break;
+			case DEC:
+				instr_dec(core, addr_zeropage);
+				break;
+			case DEX:
+				instr_de_(core, &(core->x), addr_zeropage);
+				break;
+			case DEY:
+				instr_de_(core, &(core->y), addr_zeropage);
+				break;
+
+		// Flag Sets and Clears:
+			case CLC:
+				core->fcarry = 0;
+				++(core->pc);
+				break;
+			case CLI:
+				core->fintdisable = 0;
+				++(core->pc);
+				break;
+			case CLV:
+				core->foverflow = 0;
+				++(core->pc);
+				break;
+			case SEC:
+				core->fcarry = 1;
+				++(core->pc);
+				break;
+			case SEI:
+				core->fintdisable = 1;
+				++(core->pc);
+				break;
+
 			default:
 				++(core->pc);
 				break;
@@ -477,11 +774,14 @@ int main(void) {
 	core->ram[0x0001] = 0xCC;
 
 	core->ram[0x0002] = TXS;
-	core->ram[0x0003] = 0xFF;
 
-	core->ram[0x0004] = 0xFF; // Exit
+	core->ram[0x0003] = INX;
+	core->ram[0x0004] = TXA;
+	core->ram[0x0005] = PHA;
+	
+	core->ram[0x0006] = 0xFF;
 
-	core->ram[0x00CC] = 0x00;
+	core->ram[0x000F] = 0xFF; // Exit
 
 	exec_core(core);
 	
