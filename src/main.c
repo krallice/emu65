@@ -8,9 +8,10 @@
 #define CORE_OPCODE_SIZE 0xFF
 
 // Stack Macros:
-#define CORE_STACK_PAGE 0x01
-#define CORE_STACK_SIZE 0xFF
-#define CORE_STACK_ADDRESS(X) ((CORE_STACK_PAGE << 8) + X->sp)
+#define CORE_STACK_PAGE 0x01 // 1st Page for the Stack
+#define CORE_STACK_SIZE 0xFF // Size of the stack (0x0100 -> 0x01FF)
+#define CORE_STACK_POINTER_INIT 0xFF // Initial Address to init the SP to
+#define CORE_STACK_ADDRESS(X) ((CORE_STACK_PAGE << 8) + X->sp) // Return Full 2 Byte Stack Address (0x01XX)
 
 // Flag Macros:
 #define FLAG_CARRY	0x01
@@ -210,7 +211,7 @@ core_t *init_core() {
 	core->ram = (uint8_t*)malloc(sizeof(uint8_t)*CORE_RAM_SIZE);
 	memset(core->ram, 0, sizeof(uint8_t)*CORE_RAM_SIZE);
 
-	core->sp = 0x00;
+	core->sp = CORE_STACK_POINTER_INIT;
 
 	core->falways = 1;
 
@@ -230,8 +231,9 @@ void dump_core_state(core_t *core) {
 	printf("Overflow Flag:\t\t%d\n", core->foverflow);
 
 	printf("Program Counter:\t0x%.4x\n", core->pc);
-	printf("Stack Pointer:\t\t0x%.4x\n", core->sp);
+	printf("Stack Pointer:\t\t\t0x%.4x\n", core->sp);
 	printf("Stack Pointer Value:\t\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core)]);
+	printf("Prev Stack Pointer Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) + 1]);
 }
 
 // Flag Operations:
@@ -312,6 +314,19 @@ static inline void instr_dec(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	++(core->pc);
 }
 
+// Specific Push onto Stack Operation:
+static inline void instr_pha(core_t *core) {
+	core->ram[CORE_STACK_ADDRESS(core)] = core->a;
+	--(core->sp); // Decrement Stack Pointer
+	++(core->pc);
+}
+
+// Specific Pull off the Stack
+static inline void instr_pla(core_t *core) {
+	core->a = core->ram[CORE_STACK_ADDRESS(core)];
+	++(core->sp);
+	++(core->pc);
+}
 
 // Specific ADC Funtion:
 static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
@@ -487,9 +502,11 @@ void exec_core(core_t *core) {
 			case TXS:
 				instr_t__(core, &(core->x), &(core->ram[CORE_STACK_ADDRESS(core)]));
 				break;
-
 			case TSX:
 				instr_t__(core, &(core->ram[CORE_STACK_ADDRESS(core)]), &(core->x));
+				break;
+			case PHA:
+				instr_pha(core);
 				break;
 
 		// Arithmetic Operations:
@@ -572,7 +589,6 @@ void exec_core(core_t *core) {
 			default:
 				++(core->pc);
 				break;
-
 		}
 	}
 }
@@ -587,8 +603,9 @@ int main(void) {
 	core->ram[0x0002] = TXS;
 
 	core->ram[0x0003] = INX;
-	core->ram[0x0004] = DEX;
-	core->ram[0x0005] = DEX;
+	core->ram[0x0004] = TXA;
+	core->ram[0x0005] = PHA;
+	
 	core->ram[0x0006] = 0xFF;
 
 	core->ram[0x000F] = 0xFF; // Exit
