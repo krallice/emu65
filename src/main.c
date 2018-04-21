@@ -301,9 +301,16 @@ void dump_core_state(core_t *core) {
 	printf("Overflow Flag:\t\t%d\n", core->foverflow);
 
 	printf("Program Counter:\t0x%.4x\n", core->pc);
-	printf("Stack Pointer:\t\t\t0x%.4x\n", core->sp);
-	printf("Stack Pointer Value:\t\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core)]);
-	printf("Prev Stack Pointer Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) + 1]);
+
+	printf("Stack Pointer - 4 Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) - 4]);
+	printf("Stack Pointer - 3 Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) - 3]);
+	printf("Stack Pointer - 2 Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) - 2]);
+	printf("Stack Pointer - 1 Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) - 1]);
+	printf("Stack Pointer Address:\t\t\t0x%.4x\n", core->sp);
+	printf("Stack Pointer + 1 Value:\t0x%.2x\n", core->ram[(CORE_STACK_ADDRESS(core) + 1)]);
+	printf("Stack Pointer + 1 Value:\t0x%.2x\n", core->ram[(CORE_STACK_ADDRESS(core) + 2)]);
+	printf("Stack Pointer + 1 Value:\t0x%.2x\n", core->ram[(CORE_STACK_ADDRESS(core) + 3)]);
+	printf("Stack Pointer + 1 Value:\t0x%.2x\n", core->ram[(CORE_STACK_ADDRESS(core) + 4)]);
 }
 
 // Flag Operations:
@@ -561,17 +568,29 @@ static inline void instr_jmp(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 
 static inline void instr_jsr(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
-	// Push current PC onto stack:
-	core->ram[CORE_STACK_ADDRESS(core)] = core->pc;
-	--(core->sp); // Decrement Stack Pointer
+	uint16_t jsr_address = addr_mode(core);
+	uint16_t rts_address = core->pc - 1;
 
-	// Jump to memory address:
-	core->pc = addr_mode(core);
+	uint8_t msb = rts_address >> 8;
+	uint8_t lsb = (rts_address & 0x00FF);
+
+	core->ram[CORE_STACK_ADDRESS(core)] = msb;
+	--(core->sp);
+
+	core->ram[CORE_STACK_ADDRESS(core)] = lsb;
+	--(core->sp);
+
+	core->pc = jsr_address;
 }
 
 static inline void instr_rts(core_t *core) {
 	++(core->sp);
-	core->pc = core->ram[CORE_STACK_ADDRESS(core)];
+	uint8_t lsb = core->sp;
+
+	++(core->sp);
+	uint8_t msb = core->sp;
+
+	core->pc = ((msb << 8) + lsb) + 1;
 }
 
 // todo: actually implement
@@ -978,6 +997,11 @@ void exec_core(core_t *core) {
 				++(core->pc);
 				break;
 
+			case 0x22:
+				dump_core_state(core);
+				printf("\n");
+				++(core->pc);
+
 			default:
 				++(core->pc);
 				break;
@@ -989,18 +1013,25 @@ int main(void) {
 
 	core_t *core = init_core();
 
-	core->ram[0x0000] = LDX_ZPG;
-	core->ram[0x0001] = 0xCC;
+	core->ram[0x0000] = LDA_I;
+	core->ram[0x0001] = 0x03;
+	core->ram[0x0002] = PHA;
+	core->ram[0x0003] = 0x22;
 
-	core->ram[0x0002] = TXS;
+	core->ram[0x0004] = LDA_I;
+	core->ram[0x0005] = 0x07;
+	core->ram[0x0006] = PHA;
+	core->ram[0x0007] = 0x22;
 
-	core->ram[0x0003] = INX;
-	core->ram[0x0004] = TXA;
-	core->ram[0x0005] = PHA;
-	
-	core->ram[0x0006] = 0xFF;
+	core->ram[0x0008] = PLA;
+	core->ram[0x0009] = 0x22;
 
-	core->ram[0x000F] = 0xFF; // Exit
+	//core->ram[0x000A] = PLA;
+	//core->ram[0x000B] = 0x22;
+
+	core->ram[0x000C] = 0xFF; 
+
+	// .data
 
 	exec_core(core);
 	
