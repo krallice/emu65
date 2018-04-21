@@ -324,6 +324,8 @@ static inline void instr_pha(core_t *core) {
 // Specific Pull off the Stack
 static inline void instr_pla(core_t *core) {
 	core->a = core->ram[CORE_STACK_ADDRESS(core)];
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
 	++(core->sp);
 	++(core->pc);
 }
