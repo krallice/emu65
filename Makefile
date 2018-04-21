@@ -1,5 +1,5 @@
 CC=cc
-CFLAGS=-ansi -std=gnu99 -Wall
+CFLAGS=-ansi -g -std=gnu99 -Wall
 
 LINKER=cc -o
 LFLAGS=-Wall -I. -lm
