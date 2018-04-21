@@ -69,7 +69,6 @@
 #define TXA		0x8A
 #define TYA		0x98
 
-// todo: implement:
 // Stack Operations:
 #define TXS		0x9A // Transfer value of X to Stack
 #define TSX		0xBA // Transfer value on Stack to X
@@ -323,10 +322,47 @@ static inline void instr_pha(core_t *core) {
 
 // Specific Pull off the Stack
 static inline void instr_pla(core_t *core) {
+	++(core->sp);
 	core->a = core->ram[CORE_STACK_ADDRESS(core)];
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
+	++(core->pc);
+}
+
+// Specific Push Status onto Stack:
+static inline void instr_php(core_t *core) {
+
+	uint8_t status = 0x00;
+	status &= (core->fcarry 	<< 0);
+	status &= (core->fzero 		<< 1);
+	status &= (core->fintdisable 	<< 2);
+	status &= (core->fdec 		<< 3);
+	status &= (core->fvect 		<< 4);
+	status &= (core->falways	<< 5);
+	status &= (core->foverflow 	<< 6);
+	status &= (core->fsign		<< 7);
+
+	core->ram[CORE_STACK_ADDRESS(core)] = status;
+
+	--(core->sp); // Decrement Stack Pointer
+	++(core->pc);
+}
+
+// Specific Pull Status onto Stack:
+static inline void instr_plp(core_t *core) {
+
 	++(core->sp);
+	uint8_t status = core->ram[CORE_STACK_ADDRESS(core)];
+
+	core->fcarry = 		(status >> 0) ? 1: 0;
+	core->fzero = 		(status >> 1) ? 1: 0;
+	core->fintdisable = 	(status >> 2) ? 1: 0;
+	core->fdec = 		(status >> 3) ? 1: 0;
+	core->fvect =		(status >> 4) ? 1: 0;
+	core->falways =		(status >> 5) ? 1: 0;
+	core->foverflow = 	(status >> 6) ? 1: 0;
+	core->fsign =		(status >> 7) ? 1: 0;
+
 	++(core->pc);
 }
 
@@ -509,6 +545,15 @@ void exec_core(core_t *core) {
 				break;
 			case PHA:
 				instr_pha(core);
+				break;
+			case PLA:
+				instr_pla(core);
+				break;
+			case PHP:
+				instr_php(core);
+				break;
+			case PLP:
+				instr_plp(core);
 				break;
 
 		// Arithmetic Operations:
