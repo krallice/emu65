@@ -139,6 +139,24 @@
 #define ASL_A		0x0E
 #define ASL_A_X		0x1E
 
+#define LSR_ACC		0x4A
+#define LSR_ZPG		0x46
+#define LSR_ZPG_X	0x56
+#define LSR_A		0x4E
+#define LSR_A_X		0x5E
+
+#define ROL_ACC		0x2A
+#define ROL_ZPG		0x26
+#define ROL_ZPG_X	0x36
+#define ROL_A		0x2E
+#define ROL_A_X		0x3E
+
+#define ROR_ACC		0x6A
+#define ROR_ZPG		0x66
+#define ROR_ZPG_X	0x76
+#define ROR_A		0x6E
+#define ROR_A_X		0x7E
+
 // Flag Sets/Clears
 #define CLC		0x18
 #define CLI		0x58
@@ -451,6 +469,71 @@ static inline void instr_asl(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	core->ram[address] = core->ram[address] << 1;
 	set_fzero(core, &(core->ram[address]));
 	set_fsign(core, &(core->ram[address]));
+	++(core->pc);
+}
+
+// Specific LSR for Accumulator;
+static inline void instr_lsr_acc(core_t *core) {
+	core->fcarry = (core->a & 0x01); // Carry = Bit Zero
+	core->a = core->a >> 1;
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
+	++(core->pc);
+}
+
+// Specific LSR for Memory Address:
+static inline void instr_lsr(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	uint16_t address = addr_mode(core);
+	core->fcarry = (core->ram[address] & 0x01); // Carry = Bit Zero
+	core->ram[address] = core->ram[address] >> 1;
+	set_fzero(core, &(core->ram[address]));
+	set_fsign(core, &(core->ram[address]));
+	++(core->pc);
+}
+
+// Specific ROL for Accumulator
+static inline void instr_rol_acc(core_t *core) {
+	uint8_t oldcarry = core->fcarry;
+	core->fcarry = core->a >> 7; // Carry = Bit 7
+	core->a = core->a << 1; // Shift Left
+	core->a &= oldcarry; // Bit 0 == Old Carry Value
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
+	++(core->pc);
+}
+
+// Specific ROL for Memory Address:
+static inline void instr_rol(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	uint16_t address = addr_mode(core);
+	uint8_t oldcarry = core->fcarry;
+	core->fcarry = core->ram[address] >> 7; // Carry = Bit 7
+	core->ram[address] = core->ram[address] << 1;
+	core->ram[address] &= oldcarry;
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
+	++(core->pc);
+}
+
+// Specific ROR for Accumulator:
+static inline void instr_ror_acc(core_t *core) {
+	uint8_t oldcarry = core->fcarry;
+	core->fcarry = (core->a & 0x01); // Carry = Bit 1
+	core->a = core->a >> 1; // Shift Left
+	core->a &= (oldcarry << 7); // Bit 7 == Old Carry Value
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
+	++(core->pc);
+}
+
+// Specific ROR for Memory Address:
+static inline void instr_ror(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	uint16_t address = addr_mode(core);
+	uint8_t oldcarry = core->fcarry;
+	core->fcarry = (core->ram[address] & 0x01); // Carry = Bit 7
+	core->ram[address] = core->ram[address] >> 1;
+	core->ram[address] &= (oldcarry << 7);
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
 	++(core->pc);
 }
 
@@ -772,6 +855,54 @@ void exec_core(core_t *core) {
 				break;
 			case ASL_A_X:
 				instr_asl(core, addr_absolute_x);
+				break;
+
+			case LSR_ACC:
+				instr_lsr_acc(core);
+				break;
+			case LSR_ZPG:
+				instr_lsr(core, addr_zeropage);
+				break;
+			case LSR_ZPG_X:
+				instr_lsr(core, addr_zeropage_x);
+				break;
+			case LSR_A:
+				instr_lsr(core, addr_absolute);
+				break;
+			case LSR_A_X:
+				instr_lsr(core, addr_absolute_x);
+				break;
+
+			case ROL_ACC:
+				instr_rol_acc(core);
+				break;
+			case ROL_ZPG:
+				instr_rol(core, addr_zeropage);
+				break;
+			case ROL_ZPG_X:
+				instr_rol(core, addr_zeropage_x);
+				break;
+			case ROL_A:
+				instr_rol(core, addr_absolute);
+				break;
+			case ROL_A_X:
+				instr_rol(core, addr_absolute_x);
+				break;
+
+			case ROR_ACC:
+				instr_ror_acc(core);
+				break;
+			case ROR_ZPG:
+				instr_ror(core, addr_zeropage);
+				break;
+			case ROR_ZPG_X:
+				instr_ror(core, addr_zeropage_x);
+				break;
+			case ROR_A:
+				instr_ror(core, addr_absolute);
+				break;
+			case ROR_A_X:
+				instr_ror(core, addr_absolute_x);
 				break;
 
 		// Flag Sets and Clears:
