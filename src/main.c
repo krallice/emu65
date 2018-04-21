@@ -132,6 +132,13 @@
 #define DEX		0xCA
 #define DEY		0x88
 
+// Shifts:
+#define ASL_ACC		0x0A
+#define ASL_ZPG		0x06
+#define ASL_ZPG_X	0x16
+#define ASL_A		0x0E
+#define ASL_A_X		0x1E
+
 // Flag Sets/Clears
 #define CLC		0x18
 #define CLI		0x58
@@ -174,11 +181,7 @@ typedef struct core_t {
 } core_t;
 
 // Memory Addressing Modes:
-// Each have a difference method of returning an 8bit value:
-//uint16_t addr_accumulator(core_t *core) {
-	//return core->a;
-//}
-
+// Each have a difference method of returning a 16bit Memory Address:
 uint16_t addr_immediate(core_t *core) {
 	return ++(core->pc);
 }
@@ -432,6 +435,26 @@ static inline void instr_bit(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	++(core->pc);
 }
 
+// Specific ASL for Accumulator
+static inline void instr_asl_acc(core_t *core) {
+	core->fcarry = core->a >> 7;
+	core->a = core->a << 1;
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
+	++(core->pc);
+}
+
+// Specific ASL for Memory Address:
+static inline void instr_asl(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	uint16_t address = addr_mode(core);
+	core->fcarry = core->ram[address] >> 7;
+	core->ram[address] = core->ram[address] << 1;
+	set_fzero(core, &(core->ram[address]));
+	set_fsign(core, &(core->ram[address]));
+	++(core->pc);
+}
+
+// todo: actually implement
 // Specific ADC Funtion:
 static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
@@ -732,6 +755,23 @@ void exec_core(core_t *core) {
 				break;
 			case BIT_A:
 				instr_bit(core, addr_absolute);
+				break;
+
+		// Shifts:
+			case ASL_ACC:
+				instr_asl_acc(core);
+				break;
+			case ASL_ZPG:
+				instr_asl(core, addr_zeropage);
+				break;
+			case ASL_ZPG_X:
+				instr_asl(core, addr_zeropage_x);
+				break;
+			case ASL_A:
+				instr_asl(core, addr_absolute);
+				break;
+			case ASL_A_X:
+				instr_asl(core, addr_absolute_x);
 				break;
 
 		// Flag Sets and Clears:
