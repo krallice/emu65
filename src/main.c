@@ -416,6 +416,22 @@ static inline void instr_ora(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	++(core->pc);
 }
 
+// Specific Logical BIT Operation:
+static inline void instr_bit(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	// Zero Flag - Non Destructive AND between A and M. Set Zero Flag if required.
+	// Don't overwrite A
+	// Overflow Flag - Copied from Memory
+	// Sign Flag - Copied from Memory
+
+	uint8_t mem = core->ram[addr_mode(core)]; 
+
+	((core->a & mem) == 0) ? (core->fzero = 1) : (core->fzero = 0);
+	core->foverflow = (mem >> 4) & 0x01;
+	core->fsign 	= (mem >> 7) & 0x01;
+
+	++(core->pc);
+}
+
 // Specific ADC Funtion:
 static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
@@ -431,31 +447,6 @@ static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	set_fsign(core, &(core->a));
 	++(core->pc);
 }
-
-// Specific Load Functions for Registers:
-// todo: Probably no longer required
-/*
-static inline void instr_lda(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
-	core->a = core->ram[addr_mode(core)];
-	set_fzero(core, &(core->a));
-	set_fsign(core, &(core->a));
-	++(core->pc);
-}
-
-static inline void instr_ldx(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
-	core->x = core->ram[addr_mode(core)];
-	set_fzero(core, &(core->x));
-	set_fsign(core, &(core->x));
-	++(core->pc);
-}
-
-static inline void instr_ldy(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
-	core->y = core->ram[addr_mode(core)];
-	set_fzero(core, &(core->y));
-	set_fsign(core, &(core->y));
-	++(core->pc);
-}
-*/
 
 // Main excecution cycle and instruction dispatch table:
 void exec_core(core_t *core) {
@@ -735,6 +726,12 @@ void exec_core(core_t *core) {
 				break;
 			case DEY:
 				instr_de_(core, &(core->y), addr_zeropage);
+				break;
+			case BIT_ZPG:
+				instr_bit(core, addr_zeropage);
+				break;
+			case BIT_A:
+				instr_bit(core, addr_absolute);
 				break;
 
 		// Flag Sets and Clears:
