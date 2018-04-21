@@ -157,6 +157,12 @@
 #define ROR_A		0x6E
 #define ROR_A_X		0x7E
 
+// Jumps:
+#define JMP_A		0x4C
+#define JMP_IND		0x6C
+#define JSR_A		0x20
+#define RTS		0x60
+
 // Flag Sets/Clears
 #define CLC		0x18
 #define CLI		0x58
@@ -232,6 +238,18 @@ uint16_t addr_absolute_y(core_t *core) {
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
 	return ((msb << 8) + lsb) + core->y;
+}
+
+// Used by JMP:
+uint16_t addr_indirect(core_t *core) {
+	uint8_t lsb = core->ram[++(core->pc)];
+	uint8_t msb = core->ram[++(core->pc)];
+	uint16_t indirect = ((msb << 8) + lsb);
+
+	uint8_t final_lsb = core->ram[indirect];
+	uint8_t final_msb = core->ram[indirect+1];
+
+	return ((final_msb << 8) + final_lsb);
 }
 
 uint16_t addr_indirect_x(core_t *core) {
@@ -535,6 +553,25 @@ static inline void instr_ror(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
+}
+
+static inline void instr_jmp(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	core->pc = addr_mode(core);
+}
+
+static inline void instr_jsr(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+
+	// Push current PC onto stack:
+	core->ram[CORE_STACK_ADDRESS(core)] = core->pc;
+	--(core->sp); // Decrement Stack Pointer
+
+	// Jump to memory address:
+	core->pc = addr_mode(core);
+}
+
+static inline void instr_rts(core_t *core) {
+	++(core->sp);
+	core->pc = core->ram[CORE_STACK_ADDRESS(core)];
 }
 
 // todo: actually implement
@@ -903,6 +940,20 @@ void exec_core(core_t *core) {
 				break;
 			case ROR_A_X:
 				instr_ror(core, addr_absolute_x);
+				break;
+
+		// Jumps:
+			case JMP_A:
+				instr_jmp(core, addr_absolute);
+				break;
+			case JMP_IND:
+				instr_jmp(core, addr_indirect);
+				break;
+			case JSR_A:
+				instr_jsr(core, addr_absolute);
+				break;
+			case RTS:
+				instr_rts(core);
 				break;
 
 		// Flag Sets and Clears:
