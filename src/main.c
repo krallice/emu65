@@ -77,6 +77,38 @@
 #define PLA		0x68 // Pull the value of the Stack onto A
 #define PLP		0x28 // Pull the value of the Stack onto the Processor Status
 
+// Logical:
+#define AND_I		0x29
+#define AND_ZPG		0x25
+#define AND_ZPG_X	0x35
+#define AND_A		0x2D
+#define AND_A_X		0x3D
+#define AND_A_Y		0x39
+#define AND_IND_X	0x21
+#define AND_IND_Y	0x31
+
+#define EOR_I		0x49
+#define EOR_ZPG		0x45
+#define EOR_ZPG_X	0x55
+#define EOR_A		0x4D
+#define EOR_A_X		0x5D
+#define EOR_A_Y		0x59
+#define EOR_IND_X	0x41
+#define EOR_IND_Y	0x51
+
+#define ORA_I		0x09
+#define ORA_ZPG		0x05
+#define ORA_ZPG_X	0x15
+#define ORA_A		0x0D
+#define ORA_A_X		0x1D
+#define ORA_A_Y		0x19
+#define ORA_IND_X	0x01
+#define ORA_IND_Y	0x11
+
+#define BIT_ZPG		0x24 // todo
+#define BIT_A		0x2C // todo
+
+// todo: complete
 // Arithmetic
 #define ADC_I		0x69
 #define ADC_ZPG		0x65
@@ -366,6 +398,24 @@ static inline void instr_plp(core_t *core) {
 	++(core->pc);
 }
 
+// Specific Logical AND Operation:
+static inline void instr_and(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	core->a &= core->ram[addr_mode(core)];
+	++(core->pc);
+}
+
+// Specific Logical eXclusive OR Operation:
+static inline void instr_eor(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	core->a ^= core->ram[addr_mode(core)];
+	++(core->pc);
+}
+
+// Specific Logical OR Operation:
+static inline void instr_ora(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	core->a |= core->ram[addr_mode(core)];
+	++(core->pc);
+}
+
 // Specific ADC Funtion:
 static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
@@ -580,6 +630,82 @@ void exec_core(core_t *core) {
 				break;
 			case ADC_IND_Y:
 				instr_adc(core, addr_indirect_y);
+				break;
+
+		// Logic Operations:
+			case AND_I:
+				instr_and(core, addr_immediate);
+				break;
+			case AND_ZPG:
+				instr_and(core, addr_zeropage);
+				break;
+			case AND_ZPG_X:
+				instr_and(core, addr_zeropage_x);
+				break;
+			case AND_A:
+				instr_and(core, addr_absolute);
+				break;
+			case AND_A_X:
+				instr_and(core, addr_absolute_x);
+				break;
+			case AND_A_Y:
+				instr_and(core, addr_absolute_y);
+				break;
+			case AND_IND_X:
+				instr_and(core, addr_indirect_x);
+				break;
+			case AND_IND_Y:
+				instr_and(core, addr_indirect_y);
+				break;
+
+			case EOR_I:
+				instr_eor(core, addr_immediate);
+				break;
+			case EOR_ZPG:
+				instr_eor(core, addr_zeropage);
+				break;
+			case EOR_ZPG_X:
+				instr_eor(core, addr_zeropage_x);
+				break;
+			case EOR_A:
+				instr_eor(core, addr_absolute);
+				break;
+			case EOR_A_X:
+				instr_eor(core, addr_absolute_x);
+				break;
+			case EOR_A_Y:
+				instr_eor(core, addr_absolute_y);
+				break;
+			case EOR_IND_X:
+				instr_eor(core, addr_indirect_x);
+				break;
+			case EOR_IND_Y:
+				instr_eor(core, addr_indirect_y);
+				break;
+
+			case ORA_I:
+				instr_ora(core, addr_immediate);
+				break;
+			case ORA_ZPG:
+				instr_ora(core, addr_zeropage);
+				break;
+			case ORA_ZPG_X:
+				instr_ora(core, addr_zeropage_x);
+				break;
+			case ORA_A:
+				instr_ora(core, addr_absolute);
+				break;
+			case ORA_A_X:
+				instr_ora(core, addr_absolute_x);
+				break;
+			case ORA_A_Y:
+				instr_ora(core, addr_absolute_y);
+				break;
+			case ORA_IND_X:
+				instr_ora(core, addr_indirect_x);
+				break;
+			case ORA_IND_Y:
+				instr_ora(core, addr_indirect_y);
 				break;
 
 		// Increments/Decrements:
