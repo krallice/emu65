@@ -5,6 +5,17 @@
 
 #define CORE_DEBUG 1
 
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0') 
+
 // Initialisation Macros:
 #define CORE_RAM_SIZE 0xFFFF
 #define CORE_OPCODE_SIZE 0xFF
@@ -295,15 +306,17 @@ core_t *init_core() {
 
 // Debugging:
 void dump_core_state(core_t *core) {
+
 	printf("Register A (Accumulator): 0x%.2x\n", core->a);
 
 	printf("Register X:\t\t0x%.2x\n", core->x);
 	printf("Register Y:\t\t0x%.2x\n", core->y);
 
-	printf("Zero Flag:\t\t%d\n",  core->fzero);
-	printf("Sign Flag:\t\t%d\n",  core->fsign);
 	printf("Carry Flag:\t\t%d\n", core->fcarry);
+	printf("Zero Flag:\t\t%d\n",  core->fzero);
+
 	printf("Overflow Flag:\t\t%d\n", core->foverflow);
+	printf("Sign Flag:\t\t%d\n",  core->fsign);
 
 	printf("Program Counter:\t0x%.4x\n", core->pc);
 
@@ -470,18 +483,24 @@ static inline void instr_plp(core_t *core) {
 // Specific Logical AND Operation:
 static inline void instr_and(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	core->a &= core->ram[addr_mode(core)];
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
 	++(core->pc);
 }
 
 // Specific Logical eXclusive OR Operation:
 static inline void instr_eor(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	core->a ^= core->ram[addr_mode(core)];
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
 	++(core->pc);
 }
 
 // Specific Logical OR Operation:
 static inline void instr_ora(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	core->a |= core->ram[addr_mode(core)];
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
 	++(core->pc);
 }
 
@@ -495,8 +514,13 @@ static inline void instr_bit(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t mem = core->ram[addr_mode(core)]; 
 
 	((core->a & mem) == 0) ? (core->fzero = 1) : (core->fzero = 0);
-	core->foverflow = (mem >> 4) & 0x01;
-	core->fsign 	= (mem >> 7) & 0x01;
+	core->foverflow = ((mem >> 6) & 0x01);
+	core->fsign 	= ((mem >> 7) & 0x01);
+	
+	#if CORE_DEBUG == 1
+	printf("BIT: "BYTE_TO_BINARY_PATTERN"\n", 
+			BYTE_TO_BINARY(mem)); 
+	#endif
 
 	++(core->pc);
 }
@@ -1091,50 +1115,19 @@ int main(void) {
 
 	//pg_jmptest(core);
 
-	core->ram[0x0000] = INC_ZPG;
+	core->ram[0x0000] = LDA_ZPG;
 	core->ram[0x0001] = 0x33;
 	core->ram[0x0002] = 0x22;
 
-	core->ram[0x0003] = INC_ZPG;
-	core->ram[0x0004] = 0x33;
-	core->ram[0x0005] = 0x22;
+	core->ram[0x0003] = BIT_A;
+	core->ram[0x0004] = 0x06;
+	core->ram[0x0005] = 0x00;
+	core->ram[0x0006] = 0b11000001;
 
-	core->ram[0x0005] = INC_ZPG;
-	core->ram[0x0006] = 0x33;
-	core->ram[0x0007] = 0x22;
-
-	core->ram[0x0008] = LDA_ZPG;
-	core->ram[0x0009] = 0x33;
-
-	core->ram[0x000A] = DEC_ZPG;
-	core->ram[0x000B] = 0x33;
-	core->ram[0x000C] = 0x22;
-
-	core->ram[0x000D] = LDA_ZPG;
-	core->ram[0x000E] = 0x33;
-	core->ram[0x000F] = 0x22;
-
-	core->ram[0x0010] = TAY;
-	core->ram[0x0011] = 0x22;
-
-	core->ram[0x0012] = DEY;
-	core->ram[0x0013] = 0x22;
-	core->ram[0x0014] = DEY;
-	core->ram[0x0015] = 0x22;
-	core->ram[0x0016] = DEY;
-	core->ram[0x0017] = 0x22;
-
-	core->ram[0x0018] = INY;
-	core->ram[0x0019] = 0x22;
-	core->ram[0x001A] = INY;
-	core->ram[0x001B] = 0x22;
-	core->ram[0x001C] = INY;
-	core->ram[0x001D] = 0x22;
-
-	core->ram[0x001E] = 0xFF;
+	core->ram[0x0008] = 0xFF;
 
 	// .data
-	core->ram[0x0033] = 0x49;
+	core->ram[0x0033] = 0b00000000;
 
 	exec_core(core);
 	
