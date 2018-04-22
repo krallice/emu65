@@ -1041,7 +1041,7 @@ int main(void) {
 
 	core->ram[0xC000] = LDA_ZPG;
 	core->ram[0xC001] = 0x31;
-	core->ram[0xC002] = 0x00;
+	core->ram[0xC002] = PHA;
 	core->ram[0xC003] = 0x22;
 
 	core->ram[0xC004] = JSR_A;
