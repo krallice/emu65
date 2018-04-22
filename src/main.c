@@ -1119,15 +1119,22 @@ int main(void) {
 	core->ram[0x0001] = 0x33;
 	core->ram[0x0002] = 0x22;
 
-	core->ram[0x0003] = BIT_A;
-	core->ram[0x0004] = 0x06;
-	core->ram[0x0005] = 0x00;
-	core->ram[0x0006] = 0b11000001;
+	core->ram[0x0003] = AND_I;
+	core->ram[0x0004] = 0b11110000;
+	core->ram[0x0005] = 0x22;
 
-	core->ram[0x0008] = 0xFF;
+	core->ram[0x0006] = EOR_I;
+	core->ram[0x0007] = 0b11111111;
+	core->ram[0x0008] = 0x22;
+
+	core->ram[0x0009] = ORA_I;
+	core->ram[0x000A] = 0b11111111;
+	core->ram[0x000B] = 0x22;
+
+	core->ram[0x000C] = 0xFF;
 
 	// .data
-	core->ram[0x0033] = 0b00000000;
+	core->ram[0x0033] = 0b11111111;
 
 	exec_core(core);
 	
