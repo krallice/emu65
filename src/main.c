@@ -312,7 +312,7 @@ void dump_core_state(core_t *core) {
 	printf("Stack Pointer %.4x - 3 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -3), core->ram[CORE_STACK_ADDRESS(core, -3)]);
 	printf("Stack Pointer %.4x - 2 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -2), core->ram[CORE_STACK_ADDRESS(core, -2)]);
 	printf("Stack Pointer %.4x - 1 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -1), core->ram[CORE_STACK_ADDRESS(core, -1)]);
-	printf("Stack Pointer Address:\t\t\t0x%.4x\n", core->sp);
+	printf("Stack Pointer Address:\t\t\t0x%.4x (Value: %.2x)\n", core->sp, core->ram[CORE_STACK_ADDRESS(core, 0)]);
 	printf("Stack Pointer %.4x + 1 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 1), core->ram[CORE_STACK_ADDRESS(core, 1)]);
 	printf("Stack Pointer %.4x + 2 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 2), core->ram[CORE_STACK_ADDRESS(core, 2)]);
 	printf("Stack Pointer %.4x + 3 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 3), core->ram[CORE_STACK_ADDRESS(core, 3)]);
@@ -599,13 +599,19 @@ static inline void instr_jsr(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 }
 
 static inline void instr_rts(core_t *core) {
-	++(core->sp);
-	uint8_t lsb = core->sp;
 
 	++(core->sp);
-	uint8_t msb = core->sp;
+	uint8_t lsb = core->ram[CORE_STACK_ADDRESS(core, 0)];
+
+	++(core->sp);
+	uint8_t msb = core->ram[CORE_STACK_ADDRESS(core, 0)];
 
 	core->pc = ((msb << 8) + lsb) + 1;
+	#if CORE_DEBUG == 1
+		printf("RTS LSB: %.2x\n", lsb);
+		printf("RTS MSB: %.2x\n", msb);
+		printf("RTS: PC Set to %.4x\n", core->pc);
+	#endif
 }
 
 // todo: actually implement
@@ -1029,32 +1035,28 @@ int main(void) {
 
 	core_t *core = init_core();
 
-	core->ram[0x0000] = LDA_ZPG;
-	core->ram[0x0001] = 0x30;
-	core->ram[0x0002] = PHA;
-	core->ram[0x0003] = 0x22;
+	core->ram[0x0000] = JMP_A;
+	core->ram[0x0001] = 0x00;
+	core->ram[0x0002] = 0xC0;
 
-	core->ram[0x0004] = LDA_ZPG;
-	core->ram[0x0005] = 0x31;
-	core->ram[0x0006] = PHA;
-	core->ram[0x0007] = 0x22;
+	core->ram[0xC000] = LDA_ZPG;
+	core->ram[0xC001] = 0x31;
+	core->ram[0xC002] = 0x00;
+	core->ram[0xC003] = 0x22;
 
-	core->ram[0x0008] = LDA_ZPG;
-	core->ram[0x0009] = 0x32;
-	core->ram[0x000A] = PHA;
-	core->ram[0x000B] = 0x22;
+	core->ram[0xC004] = JSR_A;
+	core->ram[0xC005] = 0xD0;
+	core->ram[0xC006] = 0xDC;
+	core->ram[0xC007] = 0x22; //DEBUG
 
-	core->ram[0x000C] = LDA_I;
-	core->ram[0x000D] = 0x55;
-	core->ram[0x000E] = 0x22;
+	core->ram[0xC008] = 0xFF;
 
-	core->ram[0x000F] = PLA;
-	core->ram[0x0010] = 0x22;
-
-	core->ram[0x0011] = PLA;
-	core->ram[0x0012] = 0x22;
-
-	core->ram[0x0013] = 0xFF;
+	core->ram[0xDCD0] = LDA_I;
+	core->ram[0xDCD1] = 0x66;
+	core->ram[0xDCD2] = LDA_I;
+	core->ram[0xDCD3] = 0x67;
+	core->ram[0xDCD4] = 0x22; //DEBUG
+	core->ram[0xDCD5] = RTS;
 
 	//core->ram[0x000A] = PLA;
 	//core->ram[0x000B] = 0x22;
