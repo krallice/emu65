@@ -426,18 +426,23 @@ static inline void instr_pla(core_t *core) {
 static inline void instr_php(core_t *core) {
 
 	uint8_t status = 0x00;
-	status &= (core->fcarry 	<< 0);
-	status &= (core->fzero 		<< 1);
-	status &= (core->fintdisable 	<< 2);
-	status &= (core->fdec 		<< 3);
-	status &= (core->fvect 		<< 4);
-	status &= (core->falways	<< 5);
-	status &= (core->foverflow 	<< 6);
-	status &= (core->fsign		<< 7);
+	status |= (core->fcarry 	<< 0);
+	status |= (core->fzero 		<< 1);
+	status |= (core->fintdisable 	<< 2);
+	status |= (core->fdec 		<< 3);
+	status |= (core->fvect 		<< 4);
+	status |= (core->falways	<< 5);
+	status |= (core->foverflow 	<< 6);
+	status |= (core->fsign		<< 7);
+
+	#if CORE_DEBUG == 1
+	printf("Zero Flag: %.2X\n", core->fzero);
+	printf("Status Word: %.2X\n", status);
+	#endif
 
 	core->ram[CORE_STACK_ADDRESS(core, 0)] = status;
-
 	--(core->sp); // Decrement Stack Pointer
+
 	++(core->pc);
 }
 
@@ -447,14 +452,14 @@ static inline void instr_plp(core_t *core) {
 	++(core->sp);
 	uint8_t status = core->ram[CORE_STACK_ADDRESS(core, 0)];
 
-	core->fcarry = 		(status >> 0) ? 1: 0;
-	core->fzero = 		(status >> 1) ? 1: 0;
-	core->fintdisable = 	(status >> 2) ? 1: 0;
-	core->fdec = 		(status >> 3) ? 1: 0;
-	core->fvect =		(status >> 4) ? 1: 0;
-	core->falways =		(status >> 5) ? 1: 0;
-	core->foverflow = 	(status >> 6) ? 1: 0;
-	core->fsign =		(status >> 7) ? 1: 0;
+	core->fcarry = 		((status >> 0) & 0x01) ? 1 : 0;
+	core->fzero = 		((status >> 1) & 0x01) ? 1 : 0;
+	core->fintdisable = 	((status >> 2) & 0x01) ? 1 : 0;
+	core->fdec = 		((status >> 3) & 0x01) ? 1 : 0;
+	core->fvect =		((status >> 4) & 0x01) ? 1 : 0;
+	core->falways =		((status >> 5) & 0x01) ? 1 : 0;
+	core->foverflow = 	((status >> 6) & 0x01) ? 1 : 0;
+	core->fsign =		((status >> 7) & 0x01) ? 1 : 0;
 
 	++(core->pc);
 }
@@ -1018,11 +1023,13 @@ void exec_core(core_t *core) {
 				++(core->pc);
 				break;
 
+			#if CORE_DEBUG == 1
 			case 0x22:
 				dump_core_state(core);
 				printf("\n");
 				++(core->pc);
 				break;
+			#endif
 
 			default:
 				++(core->pc);
@@ -1031,9 +1038,7 @@ void exec_core(core_t *core) {
 	}
 }
 
-int main(void) {
-
-	core_t *core = init_core();
+void pg_jmptest(core_t *core) {
 
 	core->ram[0x0000] = JMP_A;
 	core->ram[0x0001] = 0x00;
@@ -1065,6 +1070,28 @@ int main(void) {
 	core->ram[0x0030] = 0x07; 
 	core->ram[0x0031] = 0x09; 
 	core->ram[0x0032] = 0x0A; 
+
+}
+
+int main(void) {
+
+	core_t *core = init_core();
+
+	//pg_jmptest(core);
+
+	core->ram[0x0000] = TXA;
+	core->ram[0x0001] = PHP;
+
+	core->ram[0x0002] = LDX_I;
+	core->ram[0x0003] = 0x33;
+	core->ram[0x0004] = 0x22;
+
+	core->ram[0x0005] = PLP;;
+
+	core->ram[0x0006] = 0xFF;
+
+
+	// .data
 
 	exec_core(core);
 	
