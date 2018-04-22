@@ -3,8 +3,8 @@
 * Load Store - All Done
 * Register Transfer - All Done
 * Stack - All Done
+* Logical - All Done
 
-Logical - Not Yet Tested
 	Arithmetic - Not Yet Implemented
 
 * Increments - All Done
