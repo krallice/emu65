@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#define CORE_DEBUG 1
+
 // Initialisation Macros:
 #define CORE_RAM_SIZE 0xFFFF
 #define CORE_OPCODE_SIZE 0xFF
@@ -11,7 +13,7 @@
 #define CORE_STACK_PAGE 0x01 // 1st Page for the Stack
 #define CORE_STACK_SIZE 0xFF // Size of the stack (0x0100 -> 0x01FF)
 #define CORE_STACK_POINTER_INIT 0xFF // Initial Address to init the SP to
-#define CORE_STACK_ADDRESS(X) ((CORE_STACK_PAGE << 8) + X->sp) // Return Full 2 Byte Stack Address (0x01XX)
+#define CORE_STACK_ADDRESS(X, Y) ((CORE_STACK_PAGE << 8) + (uint8_t)(X->sp + Y)) // Return Full 2 Byte Stack Address (0x01XX)
 
 // Flag Macros:
 #define FLAG_CARRY	0x01
@@ -207,7 +209,7 @@ typedef struct core_t {
 // Memory Addressing Modes:
 // Each have a difference method of returning a 16bit Memory Address:
 uint16_t addr_immediate(core_t *core) {
-	return ++(core->pc);
+	return (uint16_t)(++(core->pc));
 }
 
 uint16_t addr_zeropage(core_t *core) {
@@ -302,15 +304,23 @@ void dump_core_state(core_t *core) {
 
 	printf("Program Counter:\t0x%.4x\n", core->pc);
 
-	printf("Stack Pointer - 4 Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) - 4]);
-	printf("Stack Pointer - 3 Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) - 3]);
-	printf("Stack Pointer - 2 Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) - 2]);
-	printf("Stack Pointer - 1 Value:\t0x%.2x\n", core->ram[CORE_STACK_ADDRESS(core) - 1]);
+	printf("Stack Pointer %.4x - 8 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -8), core->ram[CORE_STACK_ADDRESS(core, -8)]);
+	printf("Stack Pointer %.4x - 7 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -7), core->ram[CORE_STACK_ADDRESS(core, -7)]);
+	printf("Stack Pointer %.4x - 6 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -6), core->ram[CORE_STACK_ADDRESS(core, -6)]);
+	printf("Stack Pointer %.4x - 5 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -5), core->ram[CORE_STACK_ADDRESS(core, -5)]);
+	printf("Stack Pointer %.4x - 4 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -4), core->ram[CORE_STACK_ADDRESS(core, -4)]);
+	printf("Stack Pointer %.4x - 3 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -3), core->ram[CORE_STACK_ADDRESS(core, -3)]);
+	printf("Stack Pointer %.4x - 2 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -2), core->ram[CORE_STACK_ADDRESS(core, -2)]);
+	printf("Stack Pointer %.4x - 1 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, -1), core->ram[CORE_STACK_ADDRESS(core, -1)]);
 	printf("Stack Pointer Address:\t\t\t0x%.4x\n", core->sp);
-	printf("Stack Pointer + 1 Value:\t0x%.2x\n", core->ram[(CORE_STACK_ADDRESS(core) + 1)]);
-	printf("Stack Pointer + 1 Value:\t0x%.2x\n", core->ram[(CORE_STACK_ADDRESS(core) + 2)]);
-	printf("Stack Pointer + 1 Value:\t0x%.2x\n", core->ram[(CORE_STACK_ADDRESS(core) + 3)]);
-	printf("Stack Pointer + 1 Value:\t0x%.2x\n", core->ram[(CORE_STACK_ADDRESS(core) + 4)]);
+	printf("Stack Pointer %.4x + 1 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 1), core->ram[CORE_STACK_ADDRESS(core, 1)]);
+	printf("Stack Pointer %.4x + 2 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 2), core->ram[CORE_STACK_ADDRESS(core, 2)]);
+	printf("Stack Pointer %.4x + 3 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 3), core->ram[CORE_STACK_ADDRESS(core, 3)]);
+	printf("Stack Pointer %.4x + 4 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 4), core->ram[CORE_STACK_ADDRESS(core, 4)]);
+	printf("Stack Pointer %.4x + 5 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 5), core->ram[CORE_STACK_ADDRESS(core, 5)]);
+	printf("Stack Pointer %.4x + 6 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 6), core->ram[CORE_STACK_ADDRESS(core, 6)]);
+	printf("Stack Pointer %.4x + 7 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 7), core->ram[CORE_STACK_ADDRESS(core, 7)]);
+	printf("Stack Pointer %.4x + 8 Value:\t0x%.2x\n", CORE_STACK_ADDRESS(core, 8), core->ram[CORE_STACK_ADDRESS(core, 8)]);
 }
 
 // Flag Operations:
@@ -337,7 +347,12 @@ static inline void set_foverflow(core_t *core, uint8_t *a, uint8_t *b, uint8_t *
 
 // Generic Load Function:
 static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
-	*reg = core->ram[addr_mode(core)];
+	uint16_t addy = addr_mode(core);
+	#if CORE_DEBUG == 1
+	printf("addy: %.4x\n", addy);
+	printf("val: %.2x\n", core->ram[addy]);
+	#endif
+	*reg = core->ram[addy];
 	set_fzero(core, reg);
 	set_fsign(core, reg);
 	++(core->pc);
@@ -393,7 +408,7 @@ static inline void instr_dec(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 
 // Specific Push onto Stack Operation:
 static inline void instr_pha(core_t *core) {
-	core->ram[CORE_STACK_ADDRESS(core)] = core->a;
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = core->a;
 	--(core->sp); // Decrement Stack Pointer
 	++(core->pc);
 }
@@ -401,7 +416,7 @@ static inline void instr_pha(core_t *core) {
 // Specific Pull off the Stack
 static inline void instr_pla(core_t *core) {
 	++(core->sp);
-	core->a = core->ram[CORE_STACK_ADDRESS(core)];
+	core->a = core->ram[CORE_STACK_ADDRESS(core, 0)];
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -420,7 +435,7 @@ static inline void instr_php(core_t *core) {
 	status &= (core->foverflow 	<< 6);
 	status &= (core->fsign		<< 7);
 
-	core->ram[CORE_STACK_ADDRESS(core)] = status;
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = status;
 
 	--(core->sp); // Decrement Stack Pointer
 	++(core->pc);
@@ -430,7 +445,7 @@ static inline void instr_php(core_t *core) {
 static inline void instr_plp(core_t *core) {
 
 	++(core->sp);
-	uint8_t status = core->ram[CORE_STACK_ADDRESS(core)];
+	uint8_t status = core->ram[CORE_STACK_ADDRESS(core, 0)];
 
 	core->fcarry = 		(status >> 0) ? 1: 0;
 	core->fzero = 		(status >> 1) ? 1: 0;
@@ -574,10 +589,10 @@ static inline void instr_jsr(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t msb = rts_address >> 8;
 	uint8_t lsb = (rts_address & 0x00FF);
 
-	core->ram[CORE_STACK_ADDRESS(core)] = msb;
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = msb;
 	--(core->sp);
 
-	core->ram[CORE_STACK_ADDRESS(core)] = lsb;
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = lsb;
 	--(core->sp);
 
 	core->pc = jsr_address;
@@ -741,10 +756,10 @@ void exec_core(core_t *core) {
 
 		// Stack Operations:
 			case TXS:
-				instr_t__(core, &(core->x), &(core->ram[CORE_STACK_ADDRESS(core)]));
+				instr_t__(core, &(core->x), &(core->ram[CORE_STACK_ADDRESS(core, 0)]));
 				break;
 			case TSX:
-				instr_t__(core, &(core->ram[CORE_STACK_ADDRESS(core)]), &(core->x));
+				instr_t__(core, &(core->ram[CORE_STACK_ADDRESS(core, 0)]), &(core->x));
 				break;
 			case PHA:
 				instr_pha(core);
@@ -1001,6 +1016,7 @@ void exec_core(core_t *core) {
 				dump_core_state(core);
 				printf("\n");
 				++(core->pc);
+				break;
 
 			default:
 				++(core->pc);
@@ -1013,25 +1029,40 @@ int main(void) {
 
 	core_t *core = init_core();
 
-	core->ram[0x0000] = LDA_I;
-	core->ram[0x0001] = 0x03;
+	core->ram[0x0000] = LDA_ZPG;
+	core->ram[0x0001] = 0x30;
 	core->ram[0x0002] = PHA;
 	core->ram[0x0003] = 0x22;
 
-	core->ram[0x0004] = LDA_I;
-	core->ram[0x0005] = 0x07;
+	core->ram[0x0004] = LDA_ZPG;
+	core->ram[0x0005] = 0x31;
 	core->ram[0x0006] = PHA;
 	core->ram[0x0007] = 0x22;
 
-	core->ram[0x0008] = PLA;
-	core->ram[0x0009] = 0x22;
+	core->ram[0x0008] = LDA_ZPG;
+	core->ram[0x0009] = 0x32;
+	core->ram[0x000A] = PHA;
+	core->ram[0x000B] = 0x22;
+
+	core->ram[0x000C] = LDA_I;
+	core->ram[0x000D] = 0x55;
+	core->ram[0x000E] = 0x22;
+
+	core->ram[0x000F] = PLA;
+	core->ram[0x0010] = 0x22;
+
+	core->ram[0x0011] = PLA;
+	core->ram[0x0012] = 0x22;
+
+	core->ram[0x0013] = 0xFF;
 
 	//core->ram[0x000A] = PLA;
 	//core->ram[0x000B] = 0x22;
 
-	core->ram[0x000C] = 0xFF; 
-
 	// .data
+	core->ram[0x0030] = 0x07; 
+	core->ram[0x0031] = 0x09; 
+	core->ram[0x0032] = 0x0A; 
 
 	exec_core(core);
 	
