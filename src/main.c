@@ -127,10 +127,13 @@
 #define INC_A		0xEE
 #define INC_A_X		0xFE
 
+#define DEC_ZPG		0xC6
+#define DEC_ZPG_X	0xD6
+#define DEC_A		0xCE
+#define DEC_A_X		0xDE
+
 #define INX		0xE8
 #define INY		0xC8
-
-#define DEC		0xDE
 #define DEX		0xCA
 #define DEY		0x88
 
@@ -373,7 +376,7 @@ static inline void instr_t__(core_t *core, const uint8_t *src, uint8_t *dst) {
 }
 
 // Generic Register Address Increment Function:
-static inline void instr_in_(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+static inline void instr_in_(core_t *core, uint8_t *reg) {
 	++(*reg);
 	set_fzero(core, reg);
 	set_fsign(core, reg);
@@ -381,7 +384,7 @@ static inline void instr_in_(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(c
 }
 
 // Generic Register Address Decrement Function:
-static inline void instr_de_(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+static inline void instr_de_(core_t *core, uint8_t *reg) {
 	--(*reg);
 	set_fzero(core, reg);
 	set_fsign(core, reg);
@@ -901,19 +904,28 @@ void exec_core(core_t *core) {
 				instr_inc(core, addr_absolute_x);
 				break;
 			case INX:
-				instr_in_(core, &(core->x), addr_zeropage);
+				instr_in_(core, &(core->x));
 				break;
 			case INY:
-				instr_in_(core, &(core->y), addr_zeropage);
+				instr_in_(core, &(core->y));
 				break;
-			case DEC:
+			case DEC_ZPG:
 				instr_dec(core, addr_zeropage);
 				break;
+			case DEC_ZPG_X:
+				instr_dec(core, addr_zeropage_x);
+				break;
+			case DEC_A:
+				instr_dec(core, addr_absolute);
+				break;
+			case DEC_A_X:
+				instr_dec(core, addr_absolute_x);
+				break;
 			case DEX:
-				instr_de_(core, &(core->x), addr_zeropage);
+				instr_de_(core, &(core->x));
 				break;
 			case DEY:
-				instr_de_(core, &(core->y), addr_zeropage);
+				instr_de_(core, &(core->y));
 				break;
 			case BIT_ZPG:
 				instr_bit(core, addr_zeropage);
@@ -1079,19 +1091,50 @@ int main(void) {
 
 	//pg_jmptest(core);
 
-	core->ram[0x0000] = TXA;
-	core->ram[0x0001] = PHP;
+	core->ram[0x0000] = INC_ZPG;
+	core->ram[0x0001] = 0x33;
+	core->ram[0x0002] = 0x22;
 
-	core->ram[0x0002] = LDX_I;
-	core->ram[0x0003] = 0x33;
-	core->ram[0x0004] = 0x22;
+	core->ram[0x0003] = INC_ZPG;
+	core->ram[0x0004] = 0x33;
+	core->ram[0x0005] = 0x22;
 
-	core->ram[0x0005] = PLP;;
+	core->ram[0x0005] = INC_ZPG;
+	core->ram[0x0006] = 0x33;
+	core->ram[0x0007] = 0x22;
 
-	core->ram[0x0006] = 0xFF;
+	core->ram[0x0008] = LDA_ZPG;
+	core->ram[0x0009] = 0x33;
 
+	core->ram[0x000A] = DEC_ZPG;
+	core->ram[0x000B] = 0x33;
+	core->ram[0x000C] = 0x22;
+
+	core->ram[0x000D] = LDA_ZPG;
+	core->ram[0x000E] = 0x33;
+	core->ram[0x000F] = 0x22;
+
+	core->ram[0x0010] = TAY;
+	core->ram[0x0011] = 0x22;
+
+	core->ram[0x0012] = DEY;
+	core->ram[0x0013] = 0x22;
+	core->ram[0x0014] = DEY;
+	core->ram[0x0015] = 0x22;
+	core->ram[0x0016] = DEY;
+	core->ram[0x0017] = 0x22;
+
+	core->ram[0x0018] = INY;
+	core->ram[0x0019] = 0x22;
+	core->ram[0x001A] = INY;
+	core->ram[0x001B] = 0x22;
+	core->ram[0x001C] = INY;
+	core->ram[0x001D] = 0x22;
+
+	core->ram[0x001E] = 0xFF;
 
 	// .data
+	core->ram[0x0033] = 0x49;
 
 	exec_core(core);
 	
