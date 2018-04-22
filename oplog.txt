@@ -1,0 +1,17 @@
+-- No Cycle Accuracy Yet --
+
+* Load Store - All Done
+* Register Transfer - All Done
+* Stack - All Done
+
+Logical - Not Yet Tested
+	Arithmetic - Not Yet Implemented
+Increments - Not Yet Tested
+Shifts - Not Yet Tested
+
+* Jumps & Calls - All Done
+
+	Branches - Not Yet Implemented
+
+* Status Flags - All Done
+
