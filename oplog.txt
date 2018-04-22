@@ -6,7 +6,9 @@
 
 Logical - Not Yet Tested
 	Arithmetic - Not Yet Implemented
-Increments - Not Yet Tested
+
+* Increments - All Done
+
 Shifts - Not Yet Tested
 
 * Jumps & Calls - All Done
