@@ -8,9 +8,7 @@
 	Arithmetic - Not Yet Implemented
 
 * Increments - All Done
-
-Shifts - Not Yet Tested
-
+* Shifts - All Done
 * Jumps & Calls - All Done
 
 	Branches - Not Yet Implemented

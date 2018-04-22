@@ -308,6 +308,8 @@ core_t *init_core() {
 void dump_core_state(core_t *core) {
 
 	printf("Register A (Accumulator): 0x%.2x\n", core->a);
+	printf("Register A: "BYTE_TO_BINARY_PATTERN"\n", 
+			BYTE_TO_BINARY(core->a));
 
 	printf("Register X:\t\t0x%.2x\n", core->x);
 	printf("Register Y:\t\t0x%.2x\n", core->y);
@@ -568,7 +570,7 @@ static inline void instr_rol_acc(core_t *core) {
 	uint8_t oldcarry = core->fcarry;
 	core->fcarry = core->a >> 7; // Carry = Bit 7
 	core->a = core->a << 1; // Shift Left
-	core->a &= oldcarry; // Bit 0 == Old Carry Value
+	core->a |= oldcarry; // Bit 0 == Old Carry Value
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -580,7 +582,7 @@ static inline void instr_rol(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t oldcarry = core->fcarry;
 	core->fcarry = core->ram[address] >> 7; // Carry = Bit 7
 	core->ram[address] = core->ram[address] << 1;
-	core->ram[address] &= oldcarry;
+	core->ram[address] |= oldcarry;
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -591,7 +593,7 @@ static inline void instr_ror_acc(core_t *core) {
 	uint8_t oldcarry = core->fcarry;
 	core->fcarry = (core->a & 0x01); // Carry = Bit 1
 	core->a = core->a >> 1; // Shift Left
-	core->a &= (oldcarry << 7); // Bit 7 == Old Carry Value
+	core->a |= (oldcarry << 7); // Bit 7 == Old Carry Value
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -603,7 +605,7 @@ static inline void instr_ror(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t oldcarry = core->fcarry;
 	core->fcarry = (core->ram[address] & 0x01); // Carry = Bit 7
 	core->ram[address] = core->ram[address] >> 1;
-	core->ram[address] &= (oldcarry << 7);
+	core->ram[address] |= (oldcarry << 7);
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -1119,22 +1121,28 @@ int main(void) {
 	core->ram[0x0001] = 0x33;
 	core->ram[0x0002] = 0x22;
 
-	core->ram[0x0003] = AND_I;
-	core->ram[0x0004] = 0b11110000;
-	core->ram[0x0005] = 0x22;
+	core->ram[0x0003] = LSR_ACC; 
+	core->ram[0x0004] = 0x22;
 
-	core->ram[0x0006] = EOR_I;
-	core->ram[0x0007] = 0b11111111;
+	core->ram[0x0005] = ROL_ACC; 
+	core->ram[0x0006] = 0x22;
+
+	core->ram[0x0007] = ROR_ACC; 
 	core->ram[0x0008] = 0x22;
 
-	core->ram[0x0009] = ORA_I;
-	core->ram[0x000A] = 0b11111111;
-	core->ram[0x000B] = 0x22;
+	core->ram[0x0009] = ROR_ACC; 
+	core->ram[0x000A] = 0x22;
 
-	core->ram[0x000C] = 0xFF;
+	core->ram[0x000B] = ROR_ACC; 
+	core->ram[0x000C] = 0x22;
+
+	core->ram[0x000D] = ROR_ACC; 
+	core->ram[0x000E] = 0x22;
+
+	core->ram[0x000F] = 0xFF;
 
 	// .data
-	core->ram[0x0033] = 0b11111111;
+	core->ram[0x0033] = 0b00000111;
 
 	exec_core(core);
 	
