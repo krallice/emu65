@@ -132,6 +132,23 @@
 #define ADC_IND_X	0x61
 #define ADC_IND_Y	0x71
 
+#define CMP_I		0xC9
+#define CMP_ZPG		0xC5
+#define CMP_ZPG_X	0xD5
+#define CMP_A		0xCD
+#define CMP_A_X		0xDD
+#define CMP_A_Y		0xD9
+#define CMP_IND_X	0xC1
+#define CMP_IND_Y	0xD1
+
+#define CPX_I		0xE0
+#define CPX_ZPG		0xE4
+#define CPX_A		0xEC
+
+#define CPY_I		0xC0
+#define CPY_ZPG		0xC4
+#define CPY_A		0xCC
+
 // Increment/Decrements:
 #define INC_ZPG		0xE6
 #define INC_ZPG_X	0xF6
@@ -403,6 +420,16 @@ static inline void instr_de_(core_t *core, uint8_t *reg) {
 	--(*reg);
 	set_fzero(core, reg);
 	set_fsign(core, reg);
+	++(core->pc);
+}
+
+// Generic A/X/Y CMP Implementation:
+static inline void instr_cmp(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+
+	uint8_t result = *reg - core->ram[addr_mode(core)];
+	core->fcarry = (result >= 0) ? 1 : 0;
+	set_fzero(core, &result);
+	set_fsign(core, &result);
 	++(core->pc);
 }
 
@@ -840,6 +867,51 @@ void exec_core(core_t *core) {
 				instr_adc(core, addr_indirect_y);
 				break;
 
+			case CMP_I:
+				instr_cmp(core, &(core->a), addr_immediate);
+				break;
+			case CMP_ZPG:
+				instr_cmp(core, &(core->a), addr_zeropage);
+				break;
+			case CMP_ZPG_X:
+				instr_cmp(core, &(core->a), addr_zeropage_x);
+				break;
+			case CMP_A:
+				instr_cmp(core, &(core->a), addr_absolute);
+				break;
+			case CMP_A_X:
+				instr_cmp(core, &(core->a), addr_absolute_x);
+				break;
+			case CMP_A_Y:
+				instr_cmp(core, &(core->a), addr_absolute_y);
+				break;
+			case CMP_IND_X:
+				instr_cmp(core, &(core->a), addr_indirect_x);
+				break;
+			case CMP_IND_Y:
+				instr_cmp(core, &(core->a), addr_indirect_y);
+				break;
+
+			case CPX_I:
+				instr_cmp(core, &(core->x), addr_immediate);
+				break;
+			case CPX_ZPG:
+				instr_cmp(core, &(core->x), addr_zeropage);
+				break;
+			case CPX_A:
+				instr_cmp(core, &(core->x), addr_absolute);
+				break;
+
+			case CPY_I:
+			      	instr_cmp(core, &(core->y), addr_immediate);
+			      	break;
+			case CPY_ZPG:
+				instr_cmp(core, &(core->y), addr_zeropage);
+			      	break;
+			case CPY_A:
+				instr_cmp(core, &(core->y), addr_absolute);
+				break;
+
 		// Logic Operations:
 			case AND_I:
 				instr_and(core, addr_immediate);
@@ -1121,28 +1193,13 @@ int main(void) {
 	core->ram[0x0001] = 0x33;
 	core->ram[0x0002] = 0x22;
 
-	core->ram[0x0003] = LSR_ACC; 
-	core->ram[0x0004] = 0x22;
+	core->ram[0x0003] = CMP_I;
+	core->ram[0x0004] = 0x24;
 
-	core->ram[0x0005] = ROL_ACC; 
-	core->ram[0x0006] = 0x22;
-
-	core->ram[0x0007] = ROR_ACC; 
-	core->ram[0x0008] = 0x22;
-
-	core->ram[0x0009] = ROR_ACC; 
-	core->ram[0x000A] = 0x22;
-
-	core->ram[0x000B] = ROR_ACC; 
-	core->ram[0x000C] = 0x22;
-
-	core->ram[0x000D] = ROR_ACC; 
-	core->ram[0x000E] = 0x22;
-
-	core->ram[0x000F] = 0xFF;
+	core->ram[0x0005] = 0xFF;
 
 	// .data
-	core->ram[0x0033] = 0b00000111;
+	core->ram[0x0033] = 0x28;
 
 	exec_core(core);
 	
