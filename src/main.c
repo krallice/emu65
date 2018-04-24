@@ -425,7 +425,6 @@ static inline void instr_de_(core_t *core, uint8_t *reg) {
 
 // Generic A/X/Y CMP Implementation:
 static inline void instr_cmp(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
-
 	uint8_t result = *reg - core->ram[addr_mode(core)];
 	core->fcarry = (result >= 0) ? 1 : 0;
 	set_fzero(core, &result);
@@ -1193,10 +1192,19 @@ int main(void) {
 	core->ram[0x0001] = 0x33;
 	core->ram[0x0002] = 0x22;
 
-	core->ram[0x0003] = CMP_I;
+	core->ram[0x0003] = CMP_I; // M < A
 	core->ram[0x0004] = 0x24;
+	core->ram[0x0005] = 0x22;
 
-	core->ram[0x0005] = 0xFF;
+	core->ram[0x0006] = CMP_I; // M > A
+	core->ram[0x0007] = 0x36;
+	core->ram[0x0008] = 0x22;
+
+	core->ram[0x0009] = CMP_I; // M > A
+	core->ram[0x000A] = 0x24;
+	core->ram[0x000B] = 0x22;
+
+	core->ram[0x000C] = 0xFF;
 
 	// .data
 	core->ram[0x0033] = 0x28;
