@@ -248,8 +248,8 @@ typedef struct core_t {
         uint8_t fsign :1;
         uint8_t foverflow :1;
 
-	uint8_t flags;
-	uint8_t f;
+	// Instruction Cycle Lookup Table:
+	uint8_t cyc[256];
 
 	// RAM:
 	uint8_t *ram;
@@ -324,6 +324,185 @@ uint16_t addr_indirect_y(core_t *core) {
 
 // Todo: addr_relative(core_t *core)
 
+void init_cycle_table(core_t *core) {
+
+	/*
+	core->cyc[] = {
+//	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, e, f
+	7, 6, 0, 0, 0, 3, 5, 0, 3, 2, 2, 0, 0, 4, 6, 0, // 0
+	2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 4, 0, // 1
+	6, 6, 0, 0, 3, 3, 5, 0, 4, 2, 2, 0, 4, 4, 6, 0, // 2
+	2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0, // 3
+
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 4
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 5
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 6
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 7
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 8
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 9
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // a
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // b
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // c
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // d
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // e
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0  // f
+
+	};
+	*/
+	
+	core->cyc[0x00] = 7;
+	core->cyc[0x01] = 6;
+	core->cyc[0x05] = 3;
+	core->cyc[0x06] = 5;
+	core->cyc[0x08] = 3;
+	core->cyc[0x09] = 2;
+	core->cyc[0x0A] = 2;
+	core->cyc[0x0D] = 4;
+	core->cyc[0x0E] = 6;
+	core->cyc[0x10] = 2;
+	core->cyc[0x11] = 5;
+	core->cyc[0x15] = 4;
+	core->cyc[0x16] = 6;
+	core->cyc[0x18] = 2;
+	core->cyc[0x19] = 4;
+	core->cyc[0x1D] = 4;
+	core->cyc[0x1E] = 7;
+	core->cyc[0x20] = 6;
+	core->cyc[0x21] = 6;
+	core->cyc[0x24] = 3;
+	core->cyc[0x25] = 3;
+	core->cyc[0x26] = 5;
+	core->cyc[0x28] = 4;
+	core->cyc[0x29] = 2;
+	core->cyc[0x2A] = 2;
+	core->cyc[0x2C] = 4;
+	core->cyc[0x2D] = 4;
+	core->cyc[0x2E] = 6;
+	core->cyc[0x30] = 2;
+	core->cyc[0x31] = 5;
+	core->cyc[0x35] = 4;
+	core->cyc[0x36] = 6;
+	core->cyc[0x38] = 2;
+	core->cyc[0x39] = 4;
+	core->cyc[0x3D] = 4;
+	core->cyc[0x3E] = 7;
+	core->cyc[0x40] = 6;
+	core->cyc[0x41] = 6;
+	core->cyc[0x45] = 3;
+	core->cyc[0x46] = 5;
+	core->cyc[0x48] = 3;
+	core->cyc[0x49] = 2;
+	core->cyc[0x4A] = 2;
+	core->cyc[0x4C] = 3;
+	core->cyc[0x4D] = 4;
+	core->cyc[0x4E] = 6;
+	core->cyc[0x50] = 2;
+	core->cyc[0x51] = 5;
+	core->cyc[0x55] = 4;
+	core->cyc[0x56] = 6;
+	core->cyc[0x58] = 2;
+	core->cyc[0x59] = 4;
+	core->cyc[0x5D] = 4;
+	core->cyc[0x5E] = 7;
+	core->cyc[0x60] = 6;
+	core->cyc[0x61] = 6;
+	core->cyc[0x65] = 3;
+	core->cyc[0x66] = 5;
+	core->cyc[0x68] = 4;
+	core->cyc[0x69] = 2;
+	core->cyc[0x6A] = 2;
+	core->cyc[0x6C] = 5;
+	core->cyc[0x6D] = 4;
+	core->cyc[0x6E] = 6;
+	core->cyc[0x70] = 2;
+	core->cyc[0x71] = 5;
+	core->cyc[0x75] = 4;
+	core->cyc[0x76] = 6;
+	core->cyc[0x78] = 2;
+	core->cyc[0x79] = 4;
+	core->cyc[0x7D] = 4;
+	core->cyc[0x7E] = 7;
+	core->cyc[0x81] = 6;
+	core->cyc[0x84] = 3;
+	core->cyc[0x85] = 3;
+	core->cyc[0x86] = 3;
+	core->cyc[0x88] = 2;
+	core->cyc[0x8A] = 2;
+	core->cyc[0x8C] = 4;
+	core->cyc[0x8D] = 4;
+	core->cyc[0x8E] = 4;
+	core->cyc[0x90] = 2;
+	core->cyc[0x91] = 6;
+	core->cyc[0x94] = 4;
+	core->cyc[0x95] = 4;
+	core->cyc[0x96] = 4;
+	core->cyc[0x98] = 2;
+	core->cyc[0x99] = 5;
+	core->cyc[0x9A] = 2;
+	core->cyc[0x9D] = 5;
+	core->cyc[0xA0] = 2;
+	core->cyc[0xA1] = 6;
+	core->cyc[0xA2] = 2;
+	core->cyc[0xA4] = 3;
+	core->cyc[0xA5] = 3;
+	core->cyc[0xA6] = 3;
+	core->cyc[0xA8] = 2;
+	core->cyc[0xA9] = 2;
+	core->cyc[0xAA] = 2;
+	core->cyc[0xAC] = 4;
+	core->cyc[0xAD] = 4;
+	core->cyc[0xAE] = 4;
+	core->cyc[0xB0] = 2;
+	core->cyc[0xB1] = 5;
+	core->cyc[0xB4] = 4;
+	core->cyc[0xB5] = 4;
+	core->cyc[0xB6] = 4;
+	core->cyc[0xB8] = 2;
+	core->cyc[0xB9] = 4;
+	core->cyc[0xBA] = 2;
+	core->cyc[0xBC] = 4;
+	core->cyc[0xBD] = 4;
+	core->cyc[0xBE] = 4;
+	core->cyc[0xC0] = 2;
+	core->cyc[0xC1] = 6;
+	core->cyc[0xC4] = 3;
+	core->cyc[0xC5] = 3;
+	core->cyc[0xC6] = 5;
+	core->cyc[0xC8] = 2;
+	core->cyc[0xC9] = 2;
+	core->cyc[0xCA] = 2;
+	core->cyc[0xCC] = 4;
+	core->cyc[0xCD] = 4;
+	core->cyc[0xCE] = 6;
+	core->cyc[0xD0] = 2;
+	core->cyc[0xD1] = 5;
+	core->cyc[0xD5] = 4;
+	core->cyc[0xD6] = 6;
+	core->cyc[0xD8] = 2;
+	core->cyc[0xD9] = 4;
+	core->cyc[0xDD] = 4;
+	core->cyc[0xDE] = 7;
+	core->cyc[0xE0] = 2;
+	core->cyc[0xE1] = 6;
+	core->cyc[0xE4] = 3;
+	core->cyc[0xE5] = 3;
+	core->cyc[0xE6] = 5;
+	core->cyc[0xE8] = 2;
+	core->cyc[0xE9] = 2;
+	core->cyc[0xEA] = 2;
+	core->cyc[0xEC] = 4;
+	core->cyc[0xED] = 4;
+	core->cyc[0xEE] = 6;
+	core->cyc[0xF0] = 2;
+	core->cyc[0xF1] = 5;
+	core->cyc[0xF5] = 4;
+	core->cyc[0xF6] = 6;
+	core->cyc[0xF8] = 2;
+	core->cyc[0xF9] = 4;
+	core->cyc[0xFD] = 4;
+	core->cyc[0xFE] = 7;
+
+}
 // Initialise the 6502 core:
 core_t *init_core() {
 
@@ -336,6 +515,8 @@ core_t *init_core() {
 	core->sp = CORE_STACK_POINTER_INIT;
 
 	core->falways = 1;
+
+	init_cycle_table(core);
 
 	return core;
 }
