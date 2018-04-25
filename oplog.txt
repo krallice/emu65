@@ -3,12 +3,10 @@
 * Load Store - All Done
 * Register Transfer - All Done
 * Stack - All Done
-
-Logical - Not Yet Tested
-	Arithmetic - Not Yet Implemented
-Increments - Not Yet Tested
-Shifts - Not Yet Tested
-
+* Logical - All Done
+* Arithmetic - All Done
+* Increments - All Done
+* Shifts - All Done
 * Jumps & Calls - All Done
 
 	Branches - Not Yet Implemented

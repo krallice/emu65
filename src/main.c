@@ -2,8 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
 
 #define CORE_DEBUG 1
+
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  (byte & 0x80 ? '1' : '0'), \
+  (byte & 0x40 ? '1' : '0'), \
+  (byte & 0x20 ? '1' : '0'), \
+  (byte & 0x10 ? '1' : '0'), \
+  (byte & 0x08 ? '1' : '0'), \
+  (byte & 0x04 ? '1' : '0'), \
+  (byte & 0x02 ? '1' : '0'), \
+  (byte & 0x01 ? '1' : '0') 
 
 // Initialisation Macros:
 #define CORE_RAM_SIZE 0xFFFF
@@ -121,16 +133,45 @@
 #define ADC_IND_X	0x61
 #define ADC_IND_Y	0x71
 
+#define SBC_I		0xE9
+#define SBC_ZPG		0xE5
+#define SBC_ZPG_X	0xF5
+#define SBC_A		0xED
+#define SBC_A_X		0xFD
+#define SBC_A_Y		0xF9
+#define SBC_IND_X	0xE1
+#define SBC_IND_Y	0xF1
+
+#define CMP_I		0xC9
+#define CMP_ZPG		0xC5
+#define CMP_ZPG_X	0xD5
+#define CMP_A		0xCD
+#define CMP_A_X		0xDD
+#define CMP_A_Y		0xD9
+#define CMP_IND_X	0xC1
+#define CMP_IND_Y	0xD1
+
+#define CPX_I		0xE0
+#define CPX_ZPG		0xE4
+#define CPX_A		0xEC
+
+#define CPY_I		0xC0
+#define CPY_ZPG		0xC4
+#define CPY_A		0xCC
+
 // Increment/Decrements:
 #define INC_ZPG		0xE6
 #define INC_ZPG_X	0xF6
 #define INC_A		0xEE
 #define INC_A_X		0xFE
 
+#define DEC_ZPG		0xC6
+#define DEC_ZPG_X	0xD6
+#define DEC_A		0xCE
+#define DEC_A_X		0xDE
+
 #define INX		0xE8
 #define INY		0xC8
-
-#define DEC		0xDE
 #define DEX		0xCA
 #define DEY		0x88
 
@@ -292,15 +333,19 @@ core_t *init_core() {
 
 // Debugging:
 void dump_core_state(core_t *core) {
+
 	printf("Register A (Accumulator): 0x%.2x\n", core->a);
+	printf("Register A: "BYTE_TO_BINARY_PATTERN"\n", 
+			BYTE_TO_BINARY(core->a));
 
 	printf("Register X:\t\t0x%.2x\n", core->x);
 	printf("Register Y:\t\t0x%.2x\n", core->y);
 
-	printf("Zero Flag:\t\t%d\n",  core->fzero);
-	printf("Sign Flag:\t\t%d\n",  core->fsign);
 	printf("Carry Flag:\t\t%d\n", core->fcarry);
+	printf("Zero Flag:\t\t%d\n",  core->fzero);
+
 	printf("Overflow Flag:\t\t%d\n", core->foverflow);
+	printf("Sign Flag:\t\t%d\n",  core->fsign);
 
 	printf("Program Counter:\t0x%.4x\n", core->pc);
 
@@ -373,7 +418,7 @@ static inline void instr_t__(core_t *core, const uint8_t *src, uint8_t *dst) {
 }
 
 // Generic Register Address Increment Function:
-static inline void instr_in_(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+static inline void instr_in_(core_t *core, uint8_t *reg) {
 	++(*reg);
 	set_fzero(core, reg);
 	set_fsign(core, reg);
@@ -381,10 +426,19 @@ static inline void instr_in_(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(c
 }
 
 // Generic Register Address Decrement Function:
-static inline void instr_de_(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+static inline void instr_de_(core_t *core, uint8_t *reg) {
 	--(*reg);
 	set_fzero(core, reg);
 	set_fsign(core, reg);
+	++(core->pc);
+}
+
+// Generic A/X/Y CMP Implementation:
+static inline void instr_cmp(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+	uint8_t result = *reg - core->ram[addr_mode(core)];
+	core->fcarry = (result >= 0) ? 1 : 0;
+	set_fzero(core, &result);
+	set_fsign(core, &result);
 	++(core->pc);
 }
 
@@ -467,18 +521,24 @@ static inline void instr_plp(core_t *core) {
 // Specific Logical AND Operation:
 static inline void instr_and(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	core->a &= core->ram[addr_mode(core)];
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
 	++(core->pc);
 }
 
 // Specific Logical eXclusive OR Operation:
 static inline void instr_eor(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	core->a ^= core->ram[addr_mode(core)];
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
 	++(core->pc);
 }
 
 // Specific Logical OR Operation:
 static inline void instr_ora(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	core->a |= core->ram[addr_mode(core)];
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
 	++(core->pc);
 }
 
@@ -492,8 +552,13 @@ static inline void instr_bit(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t mem = core->ram[addr_mode(core)]; 
 
 	((core->a & mem) == 0) ? (core->fzero = 1) : (core->fzero = 0);
-	core->foverflow = (mem >> 4) & 0x01;
-	core->fsign 	= (mem >> 7) & 0x01;
+	core->foverflow = ((mem >> 6) & 0x01);
+	core->fsign 	= ((mem >> 7) & 0x01);
+	
+	#if CORE_DEBUG == 1
+	printf("BIT: "BYTE_TO_BINARY_PATTERN"\n", 
+			BYTE_TO_BINARY(mem)); 
+	#endif
 
 	++(core->pc);
 }
@@ -541,7 +606,7 @@ static inline void instr_rol_acc(core_t *core) {
 	uint8_t oldcarry = core->fcarry;
 	core->fcarry = core->a >> 7; // Carry = Bit 7
 	core->a = core->a << 1; // Shift Left
-	core->a &= oldcarry; // Bit 0 == Old Carry Value
+	core->a |= oldcarry; // Bit 0 == Old Carry Value
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -553,7 +618,7 @@ static inline void instr_rol(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t oldcarry = core->fcarry;
 	core->fcarry = core->ram[address] >> 7; // Carry = Bit 7
 	core->ram[address] = core->ram[address] << 1;
-	core->ram[address] &= oldcarry;
+	core->ram[address] |= oldcarry;
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -564,7 +629,7 @@ static inline void instr_ror_acc(core_t *core) {
 	uint8_t oldcarry = core->fcarry;
 	core->fcarry = (core->a & 0x01); // Carry = Bit 1
 	core->a = core->a >> 1; // Shift Left
-	core->a &= (oldcarry << 7); // Bit 7 == Old Carry Value
+	core->a |= (oldcarry << 7); // Bit 7 == Old Carry Value
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -576,7 +641,7 @@ static inline void instr_ror(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t oldcarry = core->fcarry;
 	core->fcarry = (core->ram[address] & 0x01); // Carry = Bit 7
 	core->ram[address] = core->ram[address] >> 1;
-	core->ram[address] &= (oldcarry << 7);
+	core->ram[address] |= (oldcarry << 7);
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -619,18 +684,53 @@ static inline void instr_rts(core_t *core) {
 	#endif
 }
 
-// todo: actually implement
 // Specific ADC Funtion:
 static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
-	// Set Overflow:
-	uint8_t addition = core->a + core->ram[addr_mode(core)] + core->fcarry;
-	uint8_t sum = core->a + addition;
-	set_foverflow(core, &(core->a), &addition, &sum);
+	// Our value from our memory addressing mode:
+	uint8_t mem = core->ram[addr_mode(core)];
 
-	// Set Accumulator
+	// Set our overflow
+	// ~(a + b) == If the sign bits were the same (inverse of XOR)
+	// & (a ^ sum) == If the sign bits of a+b were different
+	// & 0x80 mask off the highest bit:
+	core->foverflow = (~(core->a ^ (mem + core->fcarry)) & (core->a ^ (core->a + mem + core->fcarry)) & 0x80) ? 1 : 0;
+
+	// Perform our addition:
+	uint8_t sum = core->a + mem + core->fcarry;
+
+	// Detect a uint8_t wraparound and set carry flag if appropriate
+	core->fcarry = core->a > UCHAR_MAX - (mem + core->fcarry);
+
 	core->a = sum;
 
+	// Zero and Sign:
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
+	++(core->pc);
+}
+
+// Specific SBC Funtion:
+static inline void instr_sbc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+
+	// Our value from our memory addressing mode:
+	uint8_t mem = core->ram[addr_mode(core)];
+
+	// Set our overflow
+	// ~(a + b) == If the sign bits were the same (inverse of XOR)
+	// & (a ^ sum) == If the sign bits of a+b were different
+	// & 0x80 mask off the highest bit:
+	core->foverflow = (~(core->a ^ (mem - (1 - core->fcarry))) & (core->a ^ (core->a - mem - (1 - core->fcarry))) & 0x80) ? 1 : 0;
+
+	// Perform our addition:
+	uint8_t sum = core->a - mem - (1 - core->fcarry);
+
+	// Detect a uint8_t wraparound and set carry flag if appropriate
+	core->fcarry = core->a > (mem - (1 - core->fcarry));
+
+	core->a = sum;
+
+	// Zero and Sign:
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -811,6 +911,76 @@ void exec_core(core_t *core) {
 				instr_adc(core, addr_indirect_y);
 				break;
 
+			case SBC_I:
+				instr_sbc(core, addr_immediate);
+				break;
+			case SBC_ZPG:
+				instr_sbc(core, addr_zeropage);
+				break;
+			case SBC_ZPG_X:
+				instr_sbc(core, addr_zeropage_x);
+				break;
+			case SBC_A:
+				instr_sbc(core, addr_absolute);
+				break;
+			case SBC_A_X:
+				instr_sbc(core, addr_absolute_x);
+				break;
+			case SBC_A_Y:
+				instr_sbc(core, addr_absolute_y);
+				break;
+			case SBC_IND_X:
+				instr_sbc(core, addr_indirect_x);
+				break;
+			case SBC_IND_Y:
+				instr_sbc(core, addr_indirect_y);
+				break;
+
+			case CMP_I:
+				instr_cmp(core, &(core->a), addr_immediate);
+				break;
+			case CMP_ZPG:
+				instr_cmp(core, &(core->a), addr_zeropage);
+				break;
+			case CMP_ZPG_X:
+				instr_cmp(core, &(core->a), addr_zeropage_x);
+				break;
+			case CMP_A:
+				instr_cmp(core, &(core->a), addr_absolute);
+				break;
+			case CMP_A_X:
+				instr_cmp(core, &(core->a), addr_absolute_x);
+				break;
+			case CMP_A_Y:
+				instr_cmp(core, &(core->a), addr_absolute_y);
+				break;
+			case CMP_IND_X:
+				instr_cmp(core, &(core->a), addr_indirect_x);
+				break;
+			case CMP_IND_Y:
+				instr_cmp(core, &(core->a), addr_indirect_y);
+				break;
+
+			case CPX_I:
+				instr_cmp(core, &(core->x), addr_immediate);
+				break;
+			case CPX_ZPG:
+				instr_cmp(core, &(core->x), addr_zeropage);
+				break;
+			case CPX_A:
+				instr_cmp(core, &(core->x), addr_absolute);
+				break;
+
+			case CPY_I:
+			      	instr_cmp(core, &(core->y), addr_immediate);
+			      	break;
+			case CPY_ZPG:
+				instr_cmp(core, &(core->y), addr_zeropage);
+			      	break;
+			case CPY_A:
+				instr_cmp(core, &(core->y), addr_absolute);
+				break;
+
 		// Logic Operations:
 			case AND_I:
 				instr_and(core, addr_immediate);
@@ -901,19 +1071,28 @@ void exec_core(core_t *core) {
 				instr_inc(core, addr_absolute_x);
 				break;
 			case INX:
-				instr_in_(core, &(core->x), addr_zeropage);
+				instr_in_(core, &(core->x));
 				break;
 			case INY:
-				instr_in_(core, &(core->y), addr_zeropage);
+				instr_in_(core, &(core->y));
 				break;
-			case DEC:
+			case DEC_ZPG:
 				instr_dec(core, addr_zeropage);
 				break;
+			case DEC_ZPG_X:
+				instr_dec(core, addr_zeropage_x);
+				break;
+			case DEC_A:
+				instr_dec(core, addr_absolute);
+				break;
+			case DEC_A_X:
+				instr_dec(core, addr_absolute_x);
+				break;
 			case DEX:
-				instr_de_(core, &(core->x), addr_zeropage);
+				instr_de_(core, &(core->x));
 				break;
 			case DEY:
-				instr_de_(core, &(core->y), addr_zeropage);
+				instr_de_(core, &(core->y));
 				break;
 			case BIT_ZPG:
 				instr_bit(core, addr_zeropage);
@@ -1079,19 +1258,35 @@ int main(void) {
 
 	//pg_jmptest(core);
 
-	core->ram[0x0000] = TXA;
-	core->ram[0x0001] = PHP;
-
-	core->ram[0x0002] = LDX_I;
-	core->ram[0x0003] = 0x33;
+	core->ram[0x0000] = SEC;
+	core->ram[0x0001] = 0x22;
+	core->ram[0x0002] = LDA_I;
+	core->ram[0x0003] = 0x0E;
 	core->ram[0x0004] = 0x22;
 
-	core->ram[0x0005] = PLP;;
+	core->ram[0x0005] = SBC_I; // LowByte 0x0E - 0x0F
+	core->ram[0x0006] = 0x0F;
+	core->ram[0x0007] = 0x22;
 
-	core->ram[0x0006] = 0xFF;
+	core->ram[0x0008] = PHA; // Push Low Byte onto Stack
+	core->ram[0x0009] = 0x22;
 
+	core->ram[0x000A] = LDA_I;
+	core->ram[0x000B] = 0x02; // High Byte 0x02
+	core->ram[0x000C] = 0x22;
+
+	core->ram[0x000D] = SBC_I; // High Byte 0x00 
+	core->ram[0x000E] = 0x00; 
+	core->ram[0x000F] = 0x22;
+
+	core->ram[0x0010] = PHA; // Push High Byte onto Stack
+	core->ram[0x0011] = 0x22;
+
+	core->ram[0x0012] = 0xFF;
 
 	// .data
+	core->ram[0x0033] = 0x00;
+	core->ram[0x0034] = 50;
 
 	exec_core(core);
 	
