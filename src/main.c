@@ -122,7 +122,6 @@
 #define BIT_ZPG		0x24 // todo
 #define BIT_A		0x2C // todo
 
-// todo: complete
 // Arithmetic
 #define ADC_I		0x69
 #define ADC_ZPG		0x65
@@ -748,28 +747,36 @@ static inline void instr_sbc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 
 // Branches:
 static inline void instr_bcc(core_t *core) {
-	(core->fcarry == 0) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	(core->fcarry == 0) ? (core->pc += rel + 1) : (core->pc++);
 }
 static inline void instr_bcs(core_t *core) {
-	(core->fcarry == 1) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	(core->fcarry == 1) ? (core->pc += rel + 1) : (core->pc++);
 }
 static inline void instr_bne(core_t *core) {
-	(core->fzero == 0) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	(core->fzero == 0) ? (core->pc += rel + 1) : (core->pc++);
 }
 static inline void instr_beq(core_t *core) {
-	(core->fzero == 1) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	(core->fzero == 1) ? (core->pc += rel + 1) : (core->pc++);
 }
 static inline void instr_bpl(core_t *core) {
-	(core->fsign == 0) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	(core->fsign == 0) ? (core->pc += rel + 1) : (core->pc++);
 }
 static inline void instr_bmi(core_t *core) {
-	(core->fsign == 1) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	(core->fsign == 1) ? (core->pc += rel + 1) : (core->pc++);
 }
 static inline void instr_bvc(core_t *core) {
-	(core->foverflow == 0) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	(core->foverflow == 0) ? (core->pc += rel + 1) : (core->pc++);
 }
 static inline void instr_bvs(core_t *core) {
-	(core->foverflow == 1) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	(core->foverflow == 1) ? (core->pc += rel + 1) : (core->pc++);
 }
 
 // Main excecution cycle and instruction dispatch table:
@@ -1322,29 +1329,21 @@ int main(void) {
 
 	core->ram[0x0000] = SEC;
 	core->ram[0x0001] = 0x22;
-	core->ram[0x0002] = LDA_I;
-	core->ram[0x0003] = 0x0E;
+	core->ram[0x0002] = LDX_I;
+	core->ram[0x0003] = 0x05;
 	core->ram[0x0004] = 0x22;
 
-	core->ram[0x0005] = SBC_I; // LowByte 0x0E - 0x0F
-	core->ram[0x0006] = 0x0F;
+	core->ram[0x0005] = DEX;
+	//core->ram[0x0006] = 0x00;
 	core->ram[0x0007] = 0x22;
 
-	core->ram[0x0008] = PHA; // Push Low Byte onto Stack
-	core->ram[0x0009] = 0x22;
+	core->ram[0x0008] = BNE;
+	core->ram[0x0009] = -5;
 
 	core->ram[0x000A] = LDA_I;
-	core->ram[0x000B] = 0x02; // High Byte 0x02
-	core->ram[0x000C] = 0x22;
+	core->ram[0x000B] = 0x77;
 
-	core->ram[0x000D] = SBC_I; // High Byte 0x00 
-	core->ram[0x000E] = 0x00; 
-	core->ram[0x000F] = 0x22;
-
-	core->ram[0x0010] = PHA; // Push High Byte onto Stack
-	core->ram[0x0011] = 0x22;
-
-	core->ram[0x0012] = 0xFF;
+	core->ram[0x000C] = 0xFF;
 
 	// .data
 	core->ram[0x0033] = 0x00;

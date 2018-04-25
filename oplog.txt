@@ -1,4 +1,4 @@
--- No Cycle Accuracy Yet --
+-- Opcodes --
 
 * Load Store - All Done
 * Register Transfer - All Done
@@ -8,8 +8,17 @@
 * Increments - All Done
 * Shifts - All Done
 * Jumps & Calls - All Done
-
-	Branches - Not Yet Implemented
-
+* Branches - All Done
 * Status Flags - All Done
 
+-- Cycle Accuracy --
+	Load Store - Not Yet
+	Register Transfer - Not Yet
+	Stack - Not Yet
+	Logical - Not Yet
+	Arithmetic - Not Yet
+	Increments - Not Yet
+	Shifts - Not Yet
+	Jumps & Calls - Not Yet
+	Branches - Not Yet
+	Status Flags - Not Yet
