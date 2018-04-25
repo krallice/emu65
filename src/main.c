@@ -200,6 +200,16 @@
 #define ROR_A		0x6E
 #define ROR_A_X		0x7E
 
+// Branches:
+#define BCC		0x90
+#define BCS		0xB0
+#define BEQ		0xF0
+#define BMI		0x30
+#define BNE		0xD0
+#define BPL		0x10
+#define BVC		0x50
+#define BVS		0x70
+
 // Jumps:
 #define JMP_A		0x4C
 #define JMP_IND		0x6C
@@ -736,6 +746,32 @@ static inline void instr_sbc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	++(core->pc);
 }
 
+// Branches:
+static inline void instr_bcc(core_t *core) {
+	(core->fcarry == 0) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+}
+static inline void instr_bcs(core_t *core) {
+	(core->fcarry == 1) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+}
+static inline void instr_bne(core_t *core) {
+	(core->fzero == 0) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+}
+static inline void instr_beq(core_t *core) {
+	(core->fzero == 1) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+}
+static inline void instr_bpl(core_t *core) {
+	(core->fsign == 0) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+}
+static inline void instr_bmi(core_t *core) {
+	(core->fsign == 1) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+}
+static inline void instr_bvc(core_t *core) {
+	(core->foverflow == 0) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+}
+static inline void instr_bvs(core_t *core) {
+	(core->foverflow == 1) ? (core->pc += (int8_t)core->ram[addr_immediate(core)]) : (++(core->pc));
+}
+
 // Main excecution cycle and instruction dispatch table:
 void exec_core(core_t *core) {
 
@@ -1178,6 +1214,32 @@ void exec_core(core_t *core) {
 				break;
 			case RTS:
 				instr_rts(core);
+				break;
+
+		// Branches:
+			case BCC:
+				instr_bcc(core);
+				break;
+			case BCS:
+				instr_bcs(core);
+				break;
+			case BEQ:
+				instr_beq(core);
+				break;
+			case BMI:
+				instr_bmi(core);
+				break;
+			case BNE:
+				instr_bne(core);
+				break;
+			case BPL:
+				instr_bpl(core);
+				break;
+			case BVS:
+				instr_bvs(core);
+				break;
+			case BVC:
+				instr_bvc(core);
 				break;
 
 		// Flag Sets and Clears:
