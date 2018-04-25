@@ -133,6 +133,15 @@
 #define ADC_IND_X	0x61
 #define ADC_IND_Y	0x71
 
+#define SBC_I		0xE9
+#define SBC_ZPG		0xE5
+#define SBC_ZPG_X	0xF5
+#define SBC_A		0xED
+#define SBC_A_X		0xFD
+#define SBC_A_Y		0xF9
+#define SBC_IND_X	0xE1
+#define SBC_IND_Y	0xF1
+
 #define CMP_I		0xC9
 #define CMP_ZPG		0xC5
 #define CMP_ZPG_X	0xD5
@@ -676,7 +685,6 @@ static inline void instr_rts(core_t *core) {
 	#endif
 }
 
-// todo: actually implement
 // Specific ADC Funtion:
 static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
@@ -700,7 +708,32 @@ static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	// Zero and Sign:
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
+	++(core->pc);
+}
 
+// Specific SBC Funtion:
+static inline void instr_sbc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+
+	// Our value from our memory addressing mode:
+	uint8_t mem = core->ram[addr_mode(core)];
+
+	// Set our overflow
+	// ~(a + b) == If the sign bits were the same (inverse of XOR)
+	// & (a ^ sum) == If the sign bits of a+b were different
+	// & 0x80 mask off the highest bit:
+	core->foverflow = (~(core->a ^ (mem - (1 - core->fcarry))) & (core->a ^ (core->a - mem - (1 - core->fcarry))) & 0x80) ? 1 : 0;
+
+	// Perform our addition:
+	uint8_t sum = core->a - mem - (1 - core->fcarry);
+
+	// Detect a uint8_t wraparound and set carry flag if appropriate
+	core->fcarry = core->a > (mem - (1 - core->fcarry));
+
+	core->a = sum;
+
+	// Zero and Sign:
+	set_fzero(core, &(core->a));
+	set_fsign(core, &(core->a));
 	++(core->pc);
 }
 
@@ -877,6 +910,31 @@ void exec_core(core_t *core) {
 				break;
 			case ADC_IND_Y:
 				instr_adc(core, addr_indirect_y);
+				break;
+
+			case SBC_I:
+				instr_sbc(core, addr_immediate);
+				break;
+			case SBC_ZPG:
+				instr_sbc(core, addr_zeropage);
+				break;
+			case SBC_ZPG_X:
+				instr_sbc(core, addr_zeropage_x);
+				break;
+			case SBC_A:
+				instr_sbc(core, addr_absolute);
+				break;
+			case SBC_A_X:
+				instr_sbc(core, addr_absolute_x);
+				break;
+			case SBC_A_Y:
+				instr_sbc(core, addr_absolute_y);
+				break;
+			case SBC_IND_X:
+				instr_sbc(core, addr_indirect_x);
+				break;
+			case SBC_IND_Y:
+				instr_sbc(core, addr_indirect_y);
 				break;
 
 			case CMP_I:
@@ -1201,30 +1259,31 @@ int main(void) {
 
 	//pg_jmptest(core);
 
-	core->ram[0x0000] = CLC;
-	core->ram[0x0000] = LDA_I;
-	core->ram[0x0001] = 0xF5;
-	core->ram[0x0003] = 0x22;
+	core->ram[0x0000] = SEC;
+	core->ram[0x0001] = 0x22;
+	core->ram[0x0002] = LDA_I;
+	core->ram[0x0003] = 0x0E;
+	core->ram[0x0004] = 0x22;
 
-	core->ram[0x0004] = ADC_I;
-	core->ram[0x0005] = 0x0F; // 0xF5 + 0F
-	core->ram[0x0006] = 0x22;
+	core->ram[0x0005] = SBC_I; // LowByte 0x0E - 0x0F
+	core->ram[0x0006] = 0x0F;
+	core->ram[0x0007] = 0x22;
 
-	core->ram[0x0007] = PHA; // Push Low Byte onto Stack
-	core->ram[0x0008] = 0x22;
+	core->ram[0x0008] = PHA; // Push Low Byte onto Stack
+	core->ram[0x0009] = 0x22;
 
-	core->ram[0x0009] = LDA_I;
-	core->ram[0x000A] = 0x01;
-	core->ram[0x000B] = 0x22;
+	core->ram[0x000A] = LDA_I;
+	core->ram[0x000B] = 0x02; // High Byte 0x02
+	core->ram[0x000C] = 0x22;
 
-	core->ram[0x000C] = ADC_I;
-	core->ram[0x000D] = 0x01; // 0x01 + 0x01 (High Bytes) + Carry Hopefully
-	core->ram[0x000E] = 0x22;
+	core->ram[0x000D] = SBC_I; // High Byte 0x00 
+	core->ram[0x000E] = 0x00; 
+	core->ram[0x000F] = 0x22;
 
-	core->ram[0x000F] = PHA; // Push Low Byte onto Stack
-	core->ram[0x0010] = 0x22;
+	core->ram[0x0010] = PHA; // Push Low Byte onto Stack
+	core->ram[0x0011] = 0x22;
 
-	core->ram[0x0011] = 0xFF;
+	core->ram[0x0012] = 0xFF;
 
 	// .data
 	core->ram[0x0033] = 0x00;

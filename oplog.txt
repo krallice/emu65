@@ -4,9 +4,7 @@
 * Register Transfer - All Done
 * Stack - All Done
 * Logical - All Done
-
-	Arithmetic - Not Yet Implemented
-
+* Arithmetic - All Done
 * Increments - All Done
 * Shifts - All Done
 * Jumps & Calls - All Done
