@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
 
 #define CORE_DEBUG 1
 
@@ -679,16 +680,27 @@ static inline void instr_rts(core_t *core) {
 // Specific ADC Funtion:
 static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
-	// Set Overflow:
-	uint8_t addition = core->a + core->ram[addr_mode(core)] + core->fcarry;
-	uint8_t sum = core->a + addition;
-	set_foverflow(core, &(core->a), &addition, &sum);
+	// Our value from our memory addressing mode:
+	uint8_t mem = core->ram[addr_mode(core)];
 
-	// Set Accumulator
+	// Set our overflow
+	// ~(a + b) == If the sign bits were the same (inverse of XOR)
+	// & (a ^ sum) == If the sign bits of a+b were different
+	// & 0x80 mask off the highest bit:
+	core->foverflow = (~(core->a ^ (mem + core->fcarry)) & (core->a ^ (core->a + mem + core->fcarry)) & 0x80) ? 1 : 0;
+
+	// Perform our addition:
+	uint8_t sum = core->a + mem + core->fcarry;
+
+	// Detect a uint8_t wraparound and set carry flag if appropriate
+	core->fcarry = core->a > UCHAR_MAX - (mem + core->fcarry);
+
 	core->a = sum;
 
+	// Zero and Sign:
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
+
 	++(core->pc);
 }
 
@@ -1189,17 +1201,34 @@ int main(void) {
 
 	//pg_jmptest(core);
 
-	core->ram[0x0000] = LDA_ZPG;
-	core->ram[0x0001] = 0x33;
-	core->ram[0x0002] = 0x22;
+	core->ram[0x0000] = CLC;
+	core->ram[0x0000] = LDA_I;
+	core->ram[0x0001] = 0xF5;
+	core->ram[0x0003] = 0x22;
 
-	core->ram[0x0003] = CMP_I;
-	core->ram[0x0004] = 0x24;
+	core->ram[0x0004] = ADC_I;
+	core->ram[0x0005] = 0x0F; // 0xF5 + 0F
+	core->ram[0x0006] = 0x22;
 
-	core->ram[0x0005] = 0xFF;
+	core->ram[0x0007] = PHA; // Push Low Byte onto Stack
+	core->ram[0x0008] = 0x22;
+
+	core->ram[0x0009] = LDA_I;
+	core->ram[0x000A] = 0x01;
+	core->ram[0x000B] = 0x22;
+
+	core->ram[0x000C] = ADC_I;
+	core->ram[0x000D] = 0x01; // 0x01 + 0x01 (High Bytes) + Carry Hopefully
+	core->ram[0x000E] = 0x22;
+
+	core->ram[0x000F] = PHA; // Push Low Byte onto Stack
+	core->ram[0x0010] = 0x22;
+
+	core->ram[0x0011] = 0xFF;
 
 	// .data
-	core->ram[0x0033] = 0x28;
+	core->ram[0x0033] = 0x00;
+	core->ram[0x0034] = 50;
 
 	exec_core(core);
 	
