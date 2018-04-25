@@ -435,7 +435,6 @@ static inline void instr_de_(core_t *core, uint8_t *reg) {
 
 // Generic A/X/Y CMP Implementation:
 static inline void instr_cmp(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
-
 	uint8_t result = *reg - core->ram[addr_mode(core)];
 	core->fcarry = (result >= 0) ? 1 : 0;
 	set_fzero(core, &result);
@@ -1280,7 +1279,7 @@ int main(void) {
 	core->ram[0x000E] = 0x00; 
 	core->ram[0x000F] = 0x22;
 
-	core->ram[0x0010] = PHA; // Push Low Byte onto Stack
+	core->ram[0x0010] = PHA; // Push High Byte onto Stack
 	core->ram[0x0011] = 0x22;
 
 	core->ram[0x0012] = 0xFF;
