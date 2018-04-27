@@ -9,7 +9,7 @@
 #define CORE_DEBUG_TIMING 1
 
 #define CORE_HZ 2
-#define CORE_DO_CYCLE usleep(1000000 / CORE_HZ);
+#define CORE_DO_CYCLE usleep(1000000 / CORE_HZ)
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
@@ -298,7 +298,7 @@ uint16_t addr_absolute_x(core_t *core) {
 			#if CORE_DEBUG_TIMING == 1
 			printf("Page Boundary Cross Penalty\n");
 			#endif
-			CORE_DO_CYCLE
+			CORE_DO_CYCLE;
 		}
 	return ret;
 }
@@ -312,7 +312,7 @@ uint16_t addr_absolute_y(core_t *core) {
 			#if CORE_DEBUG_TIMING == 1
 			printf("Page Boundary Cross Penalty\n");
 			#endif
-			CORE_DO_CYCLE
+			CORE_DO_CYCLE;
 		}
 	return ret;
 }
@@ -352,7 +352,7 @@ uint16_t addr_indirect_y(core_t *core) {
 			#if CORE_DEBUG_TIMING == 1
 			printf("Page Boundary Cross Penalty\n");
 			#endif
-			CORE_DO_CYCLE
+			CORE_DO_CYCLE;
 		}
 
 	return ret;
@@ -812,35 +812,91 @@ static inline void instr_sbc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 // Branches:
 static inline void instr_bcc(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	(core->fcarry == 0) ? (core->pc += rel + 1) : (core->pc++);
+	if (core->fcarry == 0 ) {
+		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
+			CORE_DO_CYCLE;
+		CORE_DO_CYCLE;
+		core->pc += rel + 1;
+	} else {
+		++(core->pc);
+	}
 }
 static inline void instr_bcs(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	(core->fcarry == 1) ? (core->pc += rel + 1) : (core->pc++);
+	if (core->fcarry == 1 ) {
+		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
+			CORE_DO_CYCLE;
+		CORE_DO_CYCLE;
+		core->pc += rel + 1;
+	} else {
+		++(core->pc);
+	}
 }
 static inline void instr_bne(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	(core->fzero == 0) ? (core->pc += rel + 1) : (core->pc++);
+	if (core->fzero == 0 ) {
+		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
+			CORE_DO_CYCLE;
+		CORE_DO_CYCLE;
+		core->pc += rel + 1;
+	} else {
+		++(core->pc);
+	}
 }
 static inline void instr_beq(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	(core->fzero == 1) ? (core->pc += rel + 1) : (core->pc++);
+	if (core->fzero == 1 ) {
+		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
+			CORE_DO_CYCLE;
+		CORE_DO_CYCLE;
+		core->pc += rel + 1;
+	} else {
+		++(core->pc);
+	}
 }
 static inline void instr_bpl(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	(core->fsign == 0) ? (core->pc += rel + 1) : (core->pc++);
+	if (core->fsign == 0 ) {
+		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
+			CORE_DO_CYCLE;
+		CORE_DO_CYCLE;
+		core->pc += rel + 1;
+	} else {
+		++(core->pc);
+	}
 }
 static inline void instr_bmi(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	(core->fsign == 1) ? (core->pc += rel + 1) : (core->pc++);
+	if (core->fsign == 1 ) {
+		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
+			CORE_DO_CYCLE;
+		CORE_DO_CYCLE;
+		core->pc += rel + 1;
+	} else {
+		++(core->pc);
+	}
 }
 static inline void instr_bvc(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	(core->foverflow == 0) ? (core->pc += rel + 1) : (core->pc++);
+	if (core->foverflow == 0 ) {
+		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
+			CORE_DO_CYCLE;
+		CORE_DO_CYCLE;
+		core->pc += rel + 1;
+	} else {
+		++(core->pc);
+	}
 }
 static inline void instr_bvs(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	(core->foverflow == 1) ? (core->pc += rel + 1) : (core->pc++);
+	if (core->foverflow == 1 ) {
+		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
+			CORE_DO_CYCLE;
+		CORE_DO_CYCLE;
+		core->pc += rel + 1;
+	} else {
+		++(core->pc);
+	}
 }
 
 // Main excecution cycle and instruction dispatch table:
@@ -870,7 +926,7 @@ void exec_core(core_t *core) {
 			printf("Cycles: %d\n", cyclesleft);
 			#endif
 			--cyclesleft;
-			CORE_DO_CYCLE
+			CORE_DO_CYCLE;
 		}
 
 		// Execute:
