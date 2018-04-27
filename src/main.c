@@ -8,7 +8,8 @@
 #define CORE_DEBUG 1
 #define CORE_DEBUG_TIMING 1
 
-#define CORE_HZ 8
+#define CORE_HZ 2
+#define CORE_DO_CYCLE usleep(1000000 / CORE_HZ);
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
@@ -255,12 +256,12 @@ typedef struct core_t {
 	// RAM:
 	uint8_t *ram;
 
-	// Instruction Cycle Lookup Table:
-	const uint8_t *ticktable;
-	// Pointer to current Cycle Tick
-	uint8_t *optick;
-	// Penalty to tick count (page crossing etc..)
-	uint8_t tickpenalty;
+	// Ticks:
+	const uint8_t *ticktable; // Opcode Tick Table
+	uint8_t *optick; // Pointer to current ticktable element
+	
+	uint8_t checkpageboundary; // Flag to indicate that a page boundary crossing could cause a penalty:
+	uint8_t tickpenalty; // Penalty to tick count from crossing boundary:
 
 } core_t;
 
@@ -291,13 +292,29 @@ uint16_t addr_absolute(core_t *core) {
 uint16_t addr_absolute_x(core_t *core) {
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
-	return ((msb << 8) + lsb) + core->x;
+	uint16_t ret = ((msb << 8) + lsb) + core->x;
+	if ( core->checkpageboundary == 1 )
+		if ((ret & 0xFF00) != (msb << 8)) {
+			#if CORE_DEBUG_TIMING == 1
+			printf("Page Boundary Cross Penalty\n");
+			#endif
+			CORE_DO_CYCLE
+		}
+	return ret;
 }
 
 uint16_t addr_absolute_y(core_t *core) {
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
-	return ((msb << 8) + lsb) + core->y;
+	uint16_t ret = ((msb << 8) + lsb) + core->y;
+	if ( core->checkpageboundary == 1 )
+		if ((ret & 0xFF00) != (msb << 8)) {
+			#if CORE_DEBUG_TIMING == 1
+			printf("Page Boundary Cross Penalty\n");
+			#endif
+			CORE_DO_CYCLE
+		}
+	return ret;
 }
 
 // Used by JMP:
@@ -327,7 +344,18 @@ uint16_t addr_indirect_y(core_t *core) {
 	uint16_t zpg = (0x00 << 8) + (core->ram[++(core->pc)]);
 
 	// Address located in Zero page which points to our final target (Modified by Y):
-	return ((core->ram[zpg+1] << 8) + core->ram[zpg]) + core->y;
+	uint16_t ret = ((core->ram[zpg+1] << 8) + core->ram[zpg]) + core->y;
+
+	// Check Page Boundary Penalty:
+	if ( core->checkpageboundary == 1 )
+		if ((ret & 0xFF00) != (0x0000)) {
+			#if CORE_DEBUG_TIMING == 1
+			printf("Page Boundary Cross Penalty\n");
+			#endif
+			CORE_DO_CYCLE
+		}
+
+	return ret;
 }
 
 // Todo: addr_relative(core_t *core)
@@ -823,6 +851,10 @@ void exec_core(core_t *core) {
 
 	while (1) {
 
+		// Reset Page Boundary Penalty Counters:
+		core->checkpageboundary = 0;
+		core->tickpenalty = 0;
+
 		// Fetch:
 		opcode = core->ram[core->pc];
 		cyclesleft = core->ticktable[core->ram[core->pc]];
@@ -838,7 +870,7 @@ void exec_core(core_t *core) {
 			printf("Cycles: %d\n", cyclesleft);
 			#endif
 			--cyclesleft;
-			usleep(1000000 / CORE_HZ);
+			CORE_DO_CYCLE
 		}
 
 		// Execute:
@@ -863,6 +895,7 @@ void exec_core(core_t *core) {
 					instr_ld(core, &(core->x), addr_absolute);
 					break;
 				case LDX_A_Y:
+					core->checkpageboundary = 1;
 					instr_ld(core, &(core->x), addr_absolute_y);
 					break;
 
@@ -880,6 +913,7 @@ void exec_core(core_t *core) {
 					instr_ld(core, &(core->y), addr_absolute);
 					break;
 				case LDY_A_X:
+					core->checkpageboundary = 1;
 					instr_ld(core, &(core->y), addr_absolute_x);
 					break;
 
@@ -897,15 +931,18 @@ void exec_core(core_t *core) {
 					instr_ld(core, &(core->a), addr_absolute);
 					break;
 				case LDA_A_X:
+					core->checkpageboundary = 1;
 					instr_ld(core, &(core->a), addr_absolute_x);
 					break;
 				case LDA_A_Y:
+					core->checkpageboundary = 1;
 					instr_ld(core, &(core->a), addr_absolute_y);
 					break;
 				case LDA_IND_X:
 					instr_ld(core, &(core->a), addr_indirect_x);
 					break;
 				case LDA_IND_Y:
+					core->checkpageboundary = 1;
 					instr_ld(core, &(core->a), addr_indirect_y);
 					break;
 
@@ -1002,15 +1039,18 @@ void exec_core(core_t *core) {
 					instr_adc(core, addr_absolute);
 					break;
 				case ADC_A_X:
+					core->checkpageboundary = 1;
 					instr_adc(core, addr_absolute_x);
 					break;
 				case ADC_A_Y:
+					core->checkpageboundary = 1;
 					instr_adc(core, addr_absolute_y);
 					break;
 				case ADC_IND_X:
 					instr_adc(core, addr_indirect_x);
 					break;
 				case ADC_IND_Y:
+					core->checkpageboundary = 1;
 					instr_adc(core, addr_indirect_y);
 					break;
 
@@ -1027,15 +1067,18 @@ void exec_core(core_t *core) {
 					instr_sbc(core, addr_absolute);
 					break;
 				case SBC_A_X:
+					core->checkpageboundary = 1;
 					instr_sbc(core, addr_absolute_x);
 					break;
 				case SBC_A_Y:
+					core->checkpageboundary = 1;
 					instr_sbc(core, addr_absolute_y);
 					break;
 				case SBC_IND_X:
 					instr_sbc(core, addr_indirect_x);
 					break;
 				case SBC_IND_Y:
+					core->checkpageboundary = 1;
 					instr_sbc(core, addr_indirect_y);
 					break;
 
@@ -1052,15 +1095,18 @@ void exec_core(core_t *core) {
 					instr_cmp(core, &(core->a), addr_absolute);
 					break;
 				case CMP_A_X:
+					core->checkpageboundary = 1;
 					instr_cmp(core, &(core->a), addr_absolute_x);
 					break;
 				case CMP_A_Y:
+					core->checkpageboundary = 1;
 					instr_cmp(core, &(core->a), addr_absolute_y);
 					break;
 				case CMP_IND_X:
 					instr_cmp(core, &(core->a), addr_indirect_x);
 					break;
 				case CMP_IND_Y:
+					core->checkpageboundary = 1;
 					instr_cmp(core, &(core->a), addr_indirect_y);
 					break;
 
@@ -1123,15 +1169,18 @@ void exec_core(core_t *core) {
 					instr_eor(core, addr_absolute);
 					break;
 				case EOR_A_X:
+					core->checkpageboundary = 1;
 					instr_eor(core, addr_absolute_x);
 					break;
 				case EOR_A_Y:
+					core->checkpageboundary = 1;
 					instr_eor(core, addr_absolute_y);
 					break;
 				case EOR_IND_X:
 					instr_eor(core, addr_indirect_x);
 					break;
 				case EOR_IND_Y:
+					core->checkpageboundary = 1;
 					instr_eor(core, addr_indirect_y);
 					break;
 
@@ -1148,15 +1197,18 @@ void exec_core(core_t *core) {
 					instr_ora(core, addr_absolute);
 					break;
 				case ORA_A_X:
+					core->checkpageboundary = 1;
 					instr_ora(core, addr_absolute_x);
 					break;
 				case ORA_A_Y:
+					core->checkpageboundary = 1;
 					instr_ora(core, addr_absolute_y);
 					break;
 				case ORA_IND_X:
 					instr_ora(core, addr_indirect_x);
 					break;
 				case ORA_IND_Y:
+					core->checkpageboundary = 1;
 					instr_ora(core, addr_indirect_y);
 					break;
 
@@ -1388,23 +1440,34 @@ int main(void) {
 
 	//pg_jmptest(core);
 
-	core->ram[0x0000] = SEC;
-	core->ram[0x0001] = 0x22;
-	core->ram[0x0002] = LDX_I;
-	core->ram[0x0003] = 0x05;
-	core->ram[0x0004] = 0x22;
+	//core->ram[0x0000] = SEC;
+	//core->ram[0x0001] = 0x22;
+	//core->ram[0x0002] = LDX_I;
+	//core->ram[0x0003] = 0x05;
+	//core->ram[0x0004] = 0x22;
 
-	core->ram[0x0005] = DEX;
+	//core->ram[0x0005] = DEX;
 	//core->ram[0x0006] = 0x00;
-	core->ram[0x0007] = 0x22;
+	//core->ram[0x0007] = 0x22;
 
-	core->ram[0x0008] = BNE;
-	core->ram[0x0009] = -5;
+	//core->ram[0x0008] = BNE;
+	//core->ram[0x0009] = -5;
 
-	core->ram[0x000A] = LDA_I;
-	core->ram[0x000B] = 0x77;
+	//core->ram[0x000A] = LDA_I;
+	//core->ram[0x000B] = 0x77;
 
-	core->ram[0x000C] = 0xFF;
+	//core->ram[0x000C] = 0xFF;
+
+	core->ram[0x0000] = LDX_I;
+	core->ram[0x0001] = 0x03;
+	core->ram[0x0002] = 0x22;
+
+	core->ram[0x0003] = LDA_A_X;
+	core->ram[0x0004] = 0xFE;
+	core->ram[0x0005] = 0x02;
+	core->ram[0x0006] = 0x22;
+
+	core->ram[0x0007] = 0xFF;
 
 	// .data
 	core->ram[0x0033] = 0x00;
