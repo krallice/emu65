@@ -5,11 +5,9 @@
 #include <limits.h>
 #include <unistd.h>
 
+// Debug Macros:
 #define CORE_DEBUG 1
 #define CORE_DEBUG_TIMING 1
-
-#define CORE_HZ 2
-#define CORE_DO_CYCLE usleep(1000000 / CORE_HZ)
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
@@ -22,6 +20,9 @@
   (byte & 0x02 ? '1' : '0'), \
   (byte & 0x01 ? '1' : '0') 
 
+// Timing Macros:
+#define CORE_HZ 2
+
 // Initialisation Macros:
 #define CORE_RAM_SIZE 0xFFFF
 #define CORE_OPCODE_SIZE 0xFF
@@ -31,6 +32,10 @@
 #define CORE_STACK_SIZE 0xFF // Size of the stack (0x0100 -> 0x01FF)
 #define CORE_STACK_POINTER_INIT 0xFF // Initial Address to init the SP to
 #define CORE_STACK_ADDRESS(X, Y) ((CORE_STACK_PAGE << 8) + (uint8_t)(X->sp + Y)) // Return Full 2 Byte Stack Address (0x01XX)
+
+// Interrupt Macros:
+#define CORE_IRQ_LO	0xFFFE
+#define CORE_IRQ_HI	0xFFFF
 
 // Flag Macros:
 #define FLAG_CARRY	0x01
@@ -227,6 +232,11 @@
 #define SEC		0x38
 #define SEI		0x78
 
+// Misc
+#define NOP		0xEA
+#define BRK		0x00 //To Implement
+#define RTI		0x40
+
 // Struct for our 6502 CPU Core:
 typedef struct core_t {
 
@@ -263,6 +273,8 @@ typedef struct core_t {
 	uint8_t checkpageboundary; // Flag to indicate that a page boundary crossing could cause a penalty:
 	uint8_t tickpenalty; // Penalty to tick count from crossing boundary:
 
+	uint64_t cyclecount;
+
 } core_t;
 
 // Memory Addressing Modes:
@@ -298,7 +310,7 @@ uint16_t addr_absolute_x(core_t *core) {
 			#if CORE_DEBUG_TIMING == 1
 			printf("Page Boundary Cross Penalty\n");
 			#endif
-			CORE_DO_CYCLE;
+			++(core->cyclecount);
 		}
 	return ret;
 }
@@ -312,7 +324,7 @@ uint16_t addr_absolute_y(core_t *core) {
 			#if CORE_DEBUG_TIMING == 1
 			printf("Page Boundary Cross Penalty\n");
 			#endif
-			CORE_DO_CYCLE;
+			++(core->cyclecount);
 		}
 	return ret;
 }
@@ -352,7 +364,7 @@ uint16_t addr_indirect_y(core_t *core) {
 			#if CORE_DEBUG_TIMING == 1
 			printf("Page Boundary Cross Penalty\n");
 			#endif
-			CORE_DO_CYCLE;
+			++(core->cyclecount);
 		}
 
 	return ret;
@@ -389,8 +401,9 @@ core_t *init_core() {
 	core_t *core = (core_t*)malloc(sizeof(core_t));
 	memset(core, 0, sizeof(core_t));
 
+	// Fill memory with NOPs:
 	core->ram = (uint8_t*)malloc(sizeof(uint8_t)*CORE_RAM_SIZE);
-	memset(core->ram, 0, sizeof(uint8_t)*CORE_RAM_SIZE);
+	memset(core->ram, NOP, sizeof(uint8_t)*CORE_RAM_SIZE);
 
 	// Init Stack Pointer:
 	core->sp = CORE_STACK_POINTER_INIT;
@@ -552,6 +565,9 @@ static inline void instr_pla(core_t *core) {
 // Specific Push Status onto Stack:
 static inline void instr_php(core_t *core) {
 
+	core->falways = 1; // Reset our always flag
+	core->fvect = 1; // Set if BRK or PHP
+
 	uint8_t status = 0x00;
 	status |= (core->fcarry 	<< 0);
 	status |= (core->fzero 		<< 1);
@@ -573,7 +589,7 @@ static inline void instr_php(core_t *core) {
 	++(core->pc);
 }
 
-// Specific Pull Status onto Stack:
+// Specific Pull Status from Stack:
 static inline void instr_plp(core_t *core) {
 
 	++(core->sp);
@@ -583,7 +599,7 @@ static inline void instr_plp(core_t *core) {
 	core->fzero = 		((status >> 1) & 0x01) ? 1 : 0;
 	core->fintdisable = 	((status >> 2) & 0x01) ? 1 : 0;
 	core->fdec = 		((status >> 3) & 0x01) ? 1 : 0;
-	core->fvect =		((status >> 4) & 0x01) ? 1 : 0;
+	core->fvect =		((status >> 4) & 0x01) ? 1 : 0; // Technically not accurate: http://nesdev.com/the%20'B'%20flag%20&%20BRK%20instruction.txt
 	core->falways =		((status >> 5) & 0x01) ? 1 : 0;
 	core->foverflow = 	((status >> 6) & 0x01) ? 1 : 0;
 	core->fsign =		((status >> 7) & 0x01) ? 1 : 0;
@@ -814,8 +830,8 @@ static inline void instr_bcc(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
 	if (core->fcarry == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
-			CORE_DO_CYCLE;
-		CORE_DO_CYCLE;
+			++(core->cyclecount);
+		++(core->cyclecount);
 		core->pc += rel + 1;
 	} else {
 		++(core->pc);
@@ -825,8 +841,8 @@ static inline void instr_bcs(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
 	if (core->fcarry == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
-			CORE_DO_CYCLE;
-		CORE_DO_CYCLE;
+			++(core->cyclecount);
+		++(core->cyclecount);
 		core->pc += rel + 1;
 	} else {
 		++(core->pc);
@@ -836,8 +852,8 @@ static inline void instr_bne(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
 	if (core->fzero == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
-			CORE_DO_CYCLE;
-		CORE_DO_CYCLE;
+			++(core->cyclecount);
+		++(core->cyclecount);
 		core->pc += rel + 1;
 	} else {
 		++(core->pc);
@@ -847,8 +863,8 @@ static inline void instr_beq(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
 	if (core->fzero == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
-			CORE_DO_CYCLE;
-		CORE_DO_CYCLE;
+			++(core->cyclecount);
+		++(core->cyclecount);
 		core->pc += rel + 1;
 	} else {
 		++(core->pc);
@@ -858,8 +874,8 @@ static inline void instr_bpl(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
 	if (core->fsign == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
-			CORE_DO_CYCLE;
-		CORE_DO_CYCLE;
+			++(core->cyclecount);
+		++(core->cyclecount);
 		core->pc += rel + 1;
 	} else {
 		++(core->pc);
@@ -869,8 +885,8 @@ static inline void instr_bmi(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
 	if (core->fsign == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
-			CORE_DO_CYCLE;
-		CORE_DO_CYCLE;
+			++(core->cyclecount);
+		++(core->cyclecount);
 		core->pc += rel + 1;
 	} else {
 		++(core->pc);
@@ -880,8 +896,8 @@ static inline void instr_bvc(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
 	if (core->foverflow == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
-			CORE_DO_CYCLE;
-		CORE_DO_CYCLE;
+			++(core->cyclecount);
+		++(core->cyclecount);
 		core->pc += rel + 1;
 	} else {
 		++(core->pc);
@@ -891,21 +907,85 @@ static inline void instr_bvs(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
 	if (core->foverflow == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
-			CORE_DO_CYCLE;
-		CORE_DO_CYCLE;
+			++(core->cyclecount);
+		++(core->cyclecount);
 		core->pc += rel + 1;
 	} else {
 		++(core->pc);
 	}
 }
 
+void instr_brk(core_t *core) {
+	
+	++(core->pc);
+
+	// Push MSB of PC onto Stack:
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = (core->pc >> 8);
+	--(core->sp);
+
+	// Push LSB of PC onto Stack:
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = (core->pc & 0x00FF);
+	--(core->sp);
+	
+	// Push Status onto Stack
+	uint8_t status = 0x00;
+	core->fvect = 1;
+	core->falways = 1;
+	status |= (core->fcarry 	<< 0);
+	status |= (core->fzero 		<< 1);
+	status |= (core->fintdisable 	<< 2);
+	status |= (core->fdec 		<< 3);
+	status |= (core->fvect	 	<< 4); // Set Bit 4
+	status |= (core->falways	<< 5);
+	status |= (core->foverflow 	<< 6);
+	status |= (core->fsign		<< 7);
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = status;
+	--(core->sp); // Decrement Stack Pointer
+
+	// Load our Interrupt handler and set our PC to that value
+	core->pc = (uint16_t)(core->ram[CORE_IRQ_HI] << 8) + core->ram[CORE_IRQ_LO];
+
+	#if CORE_DEBUG == 1
+	printf("BRK, PC is now %.4x\n", core->pc);
+	#endif
+}
+
+void instr_rti(core_t *core) {
+
+	uint8_t status, pc_lo, pc_hi;
+
+	// Pop Status:
+	++(core->sp);
+	status = core->ram[CORE_STACK_ADDRESS(core, 0)];
+	core->fcarry = 		((status >> 0) & 0x01) ? 1 : 0;
+	core->fzero = 		((status >> 1) & 0x01) ? 1 : 0;
+	core->fintdisable = 	((status >> 2) & 0x01) ? 1 : 0;
+	core->fdec = 		((status >> 3) & 0x01) ? 1 : 0;
+	core->fvect =		((status >> 4) & 0x01) ? 1 : 0;
+	core->falways =		((status >> 5) & 0x01) ? 1 : 0;
+	core->foverflow = 	((status >> 6) & 0x01) ? 1 : 0;
+	core->fsign =		((status >> 7) & 0x01) ? 1 : 0;
+
+	// Pop PC Low:
+	++(core->sp);
+	pc_lo = core->ram[CORE_STACK_ADDRESS(core, 0)];
+
+	// Pop PC High:
+	++(core->sp);
+	pc_hi = core->ram[CORE_STACK_ADDRESS(core, 0)];
+
+	// Reset our program counter:
+	core->pc = (pc_hi << 8) + pc_lo;
+
+}
+
 // Main excecution cycle and instruction dispatch table:
 void exec_core(core_t *core) {
 
-	uint8_t cyclesleft = 0;
 	uint8_t opcode = 0x00;
+	uint64_t cycles = core->cyclecount + 1000;
 
-	while (1) {
+	while (core->cyclecount <= cycles) {
 
 		// Reset Page Boundary Penalty Counters:
 		core->checkpageboundary = 0;
@@ -913,24 +993,12 @@ void exec_core(core_t *core) {
 
 		// Fetch:
 		opcode = core->ram[core->pc];
-		cyclesleft = core->ticktable[core->ram[core->pc]];
+		core->cyclecount += core->ticktable[core->ram[core->pc]];
 
 		// Scaffolding Exit:
 		if (opcode == 0xFF) {
 			break;
 		}
-		
-		// Decode
-		while (cyclesleft > 0) {
-			#if CORE_DEBUG_TIMING == 1
-			printf("Cycles: %d\n", cyclesleft);
-			#endif
-			--cyclesleft;
-			CORE_DO_CYCLE;
-		}
-
-		// Execute:
-		if (cyclesleft == 0 ) {
 
 			// todo: Replace with a jump table?
 			switch ( core->ram[core->pc] ) {
@@ -1439,6 +1507,17 @@ void exec_core(core_t *core) {
 					++(core->pc);
 					break;
 
+			// Misc:
+				case NOP:
+					++(core->pc);
+					break;
+				case BRK:
+					instr_brk(core);
+					break;
+				case RTI:
+					instr_rti(core);
+					break;
+
 				#if CORE_DEBUG == 1
 				case 0x22:
 					dump_core_state(core);
@@ -1451,7 +1530,6 @@ void exec_core(core_t *core) {
 					++(core->pc);
 					break;
 			}
-		}
 	}
 }
 
@@ -1494,40 +1572,20 @@ int main(void) {
 
 	core_t *core = init_core();
 
-	//pg_jmptest(core);
-
-	//core->ram[0x0000] = SEC;
-	//core->ram[0x0001] = 0x22;
-	//core->ram[0x0002] = LDX_I;
-	//core->ram[0x0003] = 0x05;
-	//core->ram[0x0004] = 0x22;
-
-	//core->ram[0x0005] = DEX;
-	//core->ram[0x0006] = 0x00;
-	//core->ram[0x0007] = 0x22;
-
-	//core->ram[0x0008] = BNE;
-	//core->ram[0x0009] = -5;
-
-	//core->ram[0x000A] = LDA_I;
-	//core->ram[0x000B] = 0x77;
-
-	//core->ram[0x000C] = 0xFF;
-
 	core->ram[0x0000] = LDX_I;
 	core->ram[0x0001] = 0x03;
 	core->ram[0x0002] = 0x22;
 
-	core->ram[0x0003] = LDA_A_X;
-	core->ram[0x0004] = 0xFE;
-	core->ram[0x0005] = 0x02;
-	core->ram[0x0006] = 0x22;
+	core->ram[0x0003] = BRK;
+	core->ram[0x0004] = 0xFF;
 
-	core->ram[0x0007] = 0xFF;
+	core->ram[0x3040] = 0x22; 
+	core->ram[0x3041] = 0x22; 
+	core->ram[0x3042] = RTI; // Return From Interrupt
 
 	// .data
-	core->ram[0x0033] = 0x00;
-	core->ram[0x0034] = 50;
+	core->ram[0xFFFE] = 0x40;
+	core->ram[0xFFFF] = 0x30;
 
 	exec_core(core);
 	
