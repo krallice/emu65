@@ -1,6 +1,7 @@
 #include "nesblue.h"
 
-#define NESBLUE_CPU_FREQ 2e6 // 2 Mhz
+//#define NESBLUE_CPU_FREQ 2e6 // 2 Mhz
+#define NESBLUE_CPU_FREQ 100 // 100 Hz 
 #define STEP_DURATION 10e6 // 10 ms
 #define ONE_SECOND 1e9
 
