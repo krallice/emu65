@@ -1,281 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <limits.h>
-#include <unistd.h>
-
-// Debug Macros:
-#define CORE_DEBUG 1
-#define CORE_DEBUG_TIMING 1
-
-#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
-#define BYTE_TO_BINARY(byte)  \
-  (byte & 0x80 ? '1' : '0'), \
-  (byte & 0x40 ? '1' : '0'), \
-  (byte & 0x20 ? '1' : '0'), \
-  (byte & 0x10 ? '1' : '0'), \
-  (byte & 0x08 ? '1' : '0'), \
-  (byte & 0x04 ? '1' : '0'), \
-  (byte & 0x02 ? '1' : '0'), \
-  (byte & 0x01 ? '1' : '0') 
-
-// Timing Macros:
-#define CORE_HZ 2
-
-// Initialisation Macros:
-#define CORE_RAM_SIZE 0xFFFF
-#define CORE_OPCODE_SIZE 0xFF
-
-// Stack Macros:
-#define CORE_STACK_PAGE 0x01 // 1st Page for the Stack
-#define CORE_STACK_SIZE 0xFF // Size of the stack (0x0100 -> 0x01FF)
-#define CORE_STACK_POINTER_INIT 0xFF // Initial Address to init the SP to
-#define CORE_STACK_ADDRESS(X, Y) ((CORE_STACK_PAGE << 8) + (uint8_t)(X->sp + Y)) // Return Full 2 Byte Stack Address (0x01XX)
-
-// Interrupt Macros:
-#define CORE_IRQ_LO	0xFFFE
-#define CORE_IRQ_HI	0xFFFF
-
-// Flag Macros:
-#define FLAG_CARRY	0x01
-#define FLAG_ZERO	0x02
-#define FLAG_INTDIS	0x04 // Interrupt Disable
-#define FLAG_DEC	0x08 // (Unused)
-#define FLAG_VECT	0x10 // Clear if Interrupt Vectoring, set if BRK or PHP
-#define FLAG_ALWAYS	0x20 // Always Set (Unused)
-#define FLAG_OVERFLOW	0x40	
-#define FLAG_SIGN	0x80
-
-// Opcode Macros:
-
-// Load/Store:
-#define LDA_I		0xA9
-#define LDA_ZPG 	0xA5
-#define LDA_ZPG_X	0xB5
-#define LDA_A 		0xAD
-#define LDA_A_X		0xBD
-#define LDA_A_Y		0xB9
-#define LDA_IND_X	0xA1
-#define LDA_IND_Y	0xB1
-
-#define LDX_I		0xA2
-#define LDX_ZPG 	0xA6
-#define LDX_ZPG_Y	0xB6
-#define LDX_A 		0xAE
-#define LDX_A_Y		0xBE
-
-#define LDY_I		0xA0
-#define LDY_ZPG 	0xA4
-#define LDY_ZPG_X	0xB4
-#define LDY_A 		0xAC
-#define LDY_A_X		0xBC
-
-#define STA_ZPG		0x85
-#define STA_ZPG_X	0x95
-#define STA_A		0x8D
-#define STA_A_X		0x9D
-#define STA_A_Y		0x99
-#define STA_IND_X	0x81
-#define STA_IND_Y	0x91
-
-#define STX_ZPG		0x86
-#define STX_ZPG_Y	0x96
-#define STX_A		0x8E
-
-#define STY_ZPG		0x84
-#define STY_ZPG_X	0x94
-#define STY_A		0x8C
-
-// Register Transfers:
-#define TAX		0xAA
-#define TAY		0xA8
-#define TXA		0x8A
-#define TYA		0x98
-
-// Stack Operations:
-#define TXS		0x9A // Transfer value of X to Stack
-#define TSX		0xBA // Transfer value on Stack to X
-#define PHA		0x48 // Push the value of A onto Stack
-#define PHP		0x08 // Push the value of the Processor Status onto the Stack
-#define PLA		0x68 // Pull the value of the Stack onto A
-#define PLP		0x28 // Pull the value of the Stack onto the Processor Status
-
-// Logical:
-#define AND_I		0x29
-#define AND_ZPG		0x25
-#define AND_ZPG_X	0x35
-#define AND_A		0x2D
-#define AND_A_X		0x3D
-#define AND_A_Y		0x39
-#define AND_IND_X	0x21
-#define AND_IND_Y	0x31
-
-#define EOR_I		0x49
-#define EOR_ZPG		0x45
-#define EOR_ZPG_X	0x55
-#define EOR_A		0x4D
-#define EOR_A_X		0x5D
-#define EOR_A_Y		0x59
-#define EOR_IND_X	0x41
-#define EOR_IND_Y	0x51
-
-#define ORA_I		0x09
-#define ORA_ZPG		0x05
-#define ORA_ZPG_X	0x15
-#define ORA_A		0x0D
-#define ORA_A_X		0x1D
-#define ORA_A_Y		0x19
-#define ORA_IND_X	0x01
-#define ORA_IND_Y	0x11
-
-#define BIT_ZPG		0x24 // todo
-#define BIT_A		0x2C // todo
-
-// Arithmetic
-#define ADC_I		0x69
-#define ADC_ZPG		0x65
-#define ADC_ZPG_X	0x75
-#define ADC_A		0x6D
-#define ADC_A_X		0x7D
-#define ADC_A_Y		0x79
-#define ADC_IND_X	0x61
-#define ADC_IND_Y	0x71
-
-#define SBC_I		0xE9
-#define SBC_ZPG		0xE5
-#define SBC_ZPG_X	0xF5
-#define SBC_A		0xED
-#define SBC_A_X		0xFD
-#define SBC_A_Y		0xF9
-#define SBC_IND_X	0xE1
-#define SBC_IND_Y	0xF1
-
-#define CMP_I		0xC9
-#define CMP_ZPG		0xC5
-#define CMP_ZPG_X	0xD5
-#define CMP_A		0xCD
-#define CMP_A_X		0xDD
-#define CMP_A_Y		0xD9
-#define CMP_IND_X	0xC1
-#define CMP_IND_Y	0xD1
-
-#define CPX_I		0xE0
-#define CPX_ZPG		0xE4
-#define CPX_A		0xEC
-
-#define CPY_I		0xC0
-#define CPY_ZPG		0xC4
-#define CPY_A		0xCC
-
-// Increment/Decrements:
-#define INC_ZPG		0xE6
-#define INC_ZPG_X	0xF6
-#define INC_A		0xEE
-#define INC_A_X		0xFE
-
-#define DEC_ZPG		0xC6
-#define DEC_ZPG_X	0xD6
-#define DEC_A		0xCE
-#define DEC_A_X		0xDE
-
-#define INX		0xE8
-#define INY		0xC8
-#define DEX		0xCA
-#define DEY		0x88
-
-// Shifts:
-#define ASL_ACC		0x0A
-#define ASL_ZPG		0x06
-#define ASL_ZPG_X	0x16
-#define ASL_A		0x0E
-#define ASL_A_X		0x1E
-
-#define LSR_ACC		0x4A
-#define LSR_ZPG		0x46
-#define LSR_ZPG_X	0x56
-#define LSR_A		0x4E
-#define LSR_A_X		0x5E
-
-#define ROL_ACC		0x2A
-#define ROL_ZPG		0x26
-#define ROL_ZPG_X	0x36
-#define ROL_A		0x2E
-#define ROL_A_X		0x3E
-
-#define ROR_ACC		0x6A
-#define ROR_ZPG		0x66
-#define ROR_ZPG_X	0x76
-#define ROR_A		0x6E
-#define ROR_A_X		0x7E
-
-// Branches:
-#define BCC		0x90
-#define BCS		0xB0
-#define BEQ		0xF0
-#define BMI		0x30
-#define BNE		0xD0
-#define BPL		0x10
-#define BVC		0x50
-#define BVS		0x70
-
-// Jumps:
-#define JMP_A		0x4C
-#define JMP_IND		0x6C
-#define JSR_A		0x20
-#define RTS		0x60
-
-// Flag Sets/Clears
-#define CLC		0x18
-#define CLI		0x58
-#define CLV		0xB8
-#define SEC		0x38
-#define SEI		0x78
-
-// Misc
-#define NOP		0xEA
-#define BRK		0x00 //To Implement
-#define RTI		0x40
-
-// Struct for our 6502 CPU Core:
-typedef struct core_t {
-
-        // 16bit Program Counter:
-        uint16_t pc;
-
-        // Accumulator:
-        uint8_t a;
-
-        // X & Y Registers:
-        uint8_t x;
-        uint8_t y;
-
-        // Stack Pointer:
-        uint8_t sp;
-
-        // Used Flags:
-        uint8_t fcarry :1;
-        uint8_t fzero :1;
-        uint8_t fintdisable :1;
-	uint8_t fdec :1; // Unused
-	uint8_t fvect :1; // Clear if Interrupt Vectoring, set if BPK or PHP
-	uint8_t falways :1; // Unused
-        uint8_t fsign :1;
-        uint8_t foverflow :1;
-
-	// RAM:
-	uint8_t *ram;
-
-	// Ticks:
-	const uint8_t *ticktable; // Opcode Tick Table
-	uint8_t *optick; // Pointer to current ticktable element
-	
-	uint8_t checkpageboundary; // Flag to indicate that a page boundary crossing could cause a penalty:
-	uint8_t tickpenalty; // Penalty to tick count from crossing boundary:
-
-	uint64_t cyclecount;
-
-} core_t;
+#include "core.h"
 
 // Memory Addressing Modes:
 // Each have a difference method of returning a 16bit Memory Address:
@@ -980,615 +703,550 @@ void instr_rti(core_t *core) {
 }
 
 // Main excecution cycle and instruction dispatch table:
-void exec_core(core_t *core) {
+void step_core(core_t *core) {
 
 	uint8_t opcode = 0x00;
-	uint64_t cycles = core->cyclecount + 1000;
 
-	while (core->cyclecount <= cycles) {
+	// Reset Page Boundary Penalty Counters:
+	core->checkpageboundary = 0;
 
-		// Reset Page Boundary Penalty Counters:
-		core->checkpageboundary = 0;
-		core->tickpenalty = 0;
+	// Fetch:
+	opcode = core->ram[core->pc];
+	core->cyclecount += core->ticktable[core->ram[core->pc]];
 
-		// Fetch:
-		opcode = core->ram[core->pc];
-		core->cyclecount += core->ticktable[core->ram[core->pc]];
-
-		// Scaffolding Exit:
-		if (opcode == 0xFF) {
-			break;
-		}
-
-			// todo: Replace with a jump table?
-			switch ( core->ram[core->pc] ) {
-
-			// Load/Store:
-
-				// LDX:
-				case LDX_I:
-					instr_ld(core, &(core->x), addr_immediate);
-					break;
-				case LDX_ZPG:
-					instr_ld(core, &(core->x), addr_zeropage);
-					break;
-				case LDX_ZPG_Y:
-					instr_ld(core, &(core->x), addr_zeropage_y);
-					break;
-				case LDX_A:
-					instr_ld(core, &(core->x), addr_absolute);
-					break;
-				case LDX_A_Y:
-					core->checkpageboundary = 1;
-					instr_ld(core, &(core->x), addr_absolute_y);
-					break;
-
-				// LDY:
-				case LDY_I:
-					instr_ld(core, &(core->y), addr_immediate);
-					break;
-				case LDY_ZPG:
-					instr_ld(core, &(core->y), addr_zeropage);
-					break;
-				case LDY_ZPG_X:
-					instr_ld(core, &(core->y), addr_zeropage_x);
-					break;
-				case LDY_A:
-					instr_ld(core, &(core->y), addr_absolute);
-					break;
-				case LDY_A_X:
-					core->checkpageboundary = 1;
-					instr_ld(core, &(core->y), addr_absolute_x);
-					break;
-
-				// LDA:
-				case LDA_I:
-					instr_ld(core, &(core->a), addr_immediate);
-					break;
-				case LDA_ZPG:
-					instr_ld(core, &(core->a), addr_zeropage);
-					break;
-				case LDA_ZPG_X:
-					instr_ld(core, &(core->a), addr_zeropage_x);
-					break;
-				case LDA_A:
-					instr_ld(core, &(core->a), addr_absolute);
-					break;
-				case LDA_A_X:
-					core->checkpageboundary = 1;
-					instr_ld(core, &(core->a), addr_absolute_x);
-					break;
-				case LDA_A_Y:
-					core->checkpageboundary = 1;
-					instr_ld(core, &(core->a), addr_absolute_y);
-					break;
-				case LDA_IND_X:
-					instr_ld(core, &(core->a), addr_indirect_x);
-					break;
-				case LDA_IND_Y:
-					core->checkpageboundary = 1;
-					instr_ld(core, &(core->a), addr_indirect_y);
-					break;
-
-				// STA:
-				case STA_ZPG:
-					instr_st(core, &(core->a), addr_zeropage);
-					break;
-				case STA_ZPG_X:
-					instr_st(core, &(core->a), addr_zeropage_x);
-					break;
-				case STA_A:
-					instr_st(core, &(core->a), addr_absolute);
-					break;
-				case STA_A_X:
-					instr_st(core, &(core->a), addr_absolute_x);
-					break;
-				case STA_A_Y:
-					instr_st(core, &(core->a), addr_absolute_y);
-					break;
-				case STA_IND_X:
-					instr_st(core, &(core->a), addr_indirect_x);
-					break;
-				case STA_IND_Y:
-					instr_st(core, &(core->a), addr_indirect_y);
-					break;
-
-				// STX:
-				case STX_ZPG:
-					instr_st(core, &(core->x), addr_zeropage);
-					break;
-				case STX_ZPG_Y:
-					instr_st(core, &(core->x), addr_zeropage_y);
-					break;
-				case STX_A:
-					instr_st(core, &(core->x), addr_absolute);
-					break;
-
-				// STY:
-				case STY_ZPG:
-					instr_st(core, &(core->y), addr_zeropage);
-					break;
-				case STY_ZPG_X:
-					instr_st(core, &(core->y), addr_zeropage_x);
-					break;
-				case STY_A:
-					instr_st(core, &(core->y), addr_absolute);
-					break;
-
-			// Register Transfers:
-				case TAX:
-					instr_t__(core, &(core->a), &(core->x));
-					break;
-				case TAY:
-					instr_t__(core, &(core->a), &(core->y));
-					break;
-				case TXA:
-					instr_t__(core, &(core->x), &(core->a));
-					break;
-				case TYA:
-					instr_t__(core, &(core->y), &(core->a));
-					break;
-
-			// Stack Operations:
-				case TXS:
-					instr_t__(core, &(core->x), &(core->ram[CORE_STACK_ADDRESS(core, 0)]));
-					break;
-				case TSX:
-					instr_t__(core, &(core->ram[CORE_STACK_ADDRESS(core, 0)]), &(core->x));
-					break;
-				case PHA:
-					instr_pha(core);
-					break;
-				case PLA:
-					instr_pla(core);
-					break;
-				case PHP:
-					instr_php(core);
-					break;
-				case PLP:
-					instr_plp(core);
-					break;
-
-			// Arithmetic Operations:
-				case ADC_I:
-					instr_adc(core, addr_immediate);
-					break;
-				case ADC_ZPG:
-					instr_adc(core, addr_zeropage);
-					break;
-				case ADC_ZPG_X:
-					instr_adc(core, addr_zeropage_x);
-					break;
-				case ADC_A:
-					instr_adc(core, addr_absolute);
-					break;
-				case ADC_A_X:
-					core->checkpageboundary = 1;
-					instr_adc(core, addr_absolute_x);
-					break;
-				case ADC_A_Y:
-					core->checkpageboundary = 1;
-					instr_adc(core, addr_absolute_y);
-					break;
-				case ADC_IND_X:
-					instr_adc(core, addr_indirect_x);
-					break;
-				case ADC_IND_Y:
-					core->checkpageboundary = 1;
-					instr_adc(core, addr_indirect_y);
-					break;
-
-				case SBC_I:
-					instr_sbc(core, addr_immediate);
-					break;
-				case SBC_ZPG:
-					instr_sbc(core, addr_zeropage);
-					break;
-				case SBC_ZPG_X:
-					instr_sbc(core, addr_zeropage_x);
-					break;
-				case SBC_A:
-					instr_sbc(core, addr_absolute);
-					break;
-				case SBC_A_X:
-					core->checkpageboundary = 1;
-					instr_sbc(core, addr_absolute_x);
-					break;
-				case SBC_A_Y:
-					core->checkpageboundary = 1;
-					instr_sbc(core, addr_absolute_y);
-					break;
-				case SBC_IND_X:
-					instr_sbc(core, addr_indirect_x);
-					break;
-				case SBC_IND_Y:
-					core->checkpageboundary = 1;
-					instr_sbc(core, addr_indirect_y);
-					break;
-
-				case CMP_I:
-					instr_cmp(core, &(core->a), addr_immediate);
-					break;
-				case CMP_ZPG:
-					instr_cmp(core, &(core->a), addr_zeropage);
-					break;
-				case CMP_ZPG_X:
-					instr_cmp(core, &(core->a), addr_zeropage_x);
-					break;
-				case CMP_A:
-					instr_cmp(core, &(core->a), addr_absolute);
-					break;
-				case CMP_A_X:
-					core->checkpageboundary = 1;
-					instr_cmp(core, &(core->a), addr_absolute_x);
-					break;
-				case CMP_A_Y:
-					core->checkpageboundary = 1;
-					instr_cmp(core, &(core->a), addr_absolute_y);
-					break;
-				case CMP_IND_X:
-					instr_cmp(core, &(core->a), addr_indirect_x);
-					break;
-				case CMP_IND_Y:
-					core->checkpageboundary = 1;
-					instr_cmp(core, &(core->a), addr_indirect_y);
-					break;
-
-				case CPX_I:
-					instr_cmp(core, &(core->x), addr_immediate);
-					break;
-				case CPX_ZPG:
-					instr_cmp(core, &(core->x), addr_zeropage);
-					break;
-				case CPX_A:
-					instr_cmp(core, &(core->x), addr_absolute);
-					break;
-
-				case CPY_I:
-					instr_cmp(core, &(core->y), addr_immediate);
-					break;
-				case CPY_ZPG:
-					instr_cmp(core, &(core->y), addr_zeropage);
-					break;
-				case CPY_A:
-					instr_cmp(core, &(core->y), addr_absolute);
-					break;
-
-			// Logic Operations:
-				case AND_I:
-					instr_and(core, addr_immediate);
-					break;
-				case AND_ZPG:
-					instr_and(core, addr_zeropage);
-					break;
-				case AND_ZPG_X:
-					instr_and(core, addr_zeropage_x);
-					break;
-				case AND_A:
-					instr_and(core, addr_absolute);
-					break;
-				case AND_A_X:
-					instr_and(core, addr_absolute_x);
-					break;
-				case AND_A_Y:
-					instr_and(core, addr_absolute_y);
-					break;
-				case AND_IND_X:
-					instr_and(core, addr_indirect_x);
-					break;
-				case AND_IND_Y:
-					instr_and(core, addr_indirect_y);
-					break;
-
-				case EOR_I:
-					instr_eor(core, addr_immediate);
-					break;
-				case EOR_ZPG:
-					instr_eor(core, addr_zeropage);
-					break;
-				case EOR_ZPG_X:
-					instr_eor(core, addr_zeropage_x);
-					break;
-				case EOR_A:
-					instr_eor(core, addr_absolute);
-					break;
-				case EOR_A_X:
-					core->checkpageboundary = 1;
-					instr_eor(core, addr_absolute_x);
-					break;
-				case EOR_A_Y:
-					core->checkpageboundary = 1;
-					instr_eor(core, addr_absolute_y);
-					break;
-				case EOR_IND_X:
-					instr_eor(core, addr_indirect_x);
-					break;
-				case EOR_IND_Y:
-					core->checkpageboundary = 1;
-					instr_eor(core, addr_indirect_y);
-					break;
-
-				case ORA_I:
-					instr_ora(core, addr_immediate);
-					break;
-				case ORA_ZPG:
-					instr_ora(core, addr_zeropage);
-					break;
-				case ORA_ZPG_X:
-					instr_ora(core, addr_zeropage_x);
-					break;
-				case ORA_A:
-					instr_ora(core, addr_absolute);
-					break;
-				case ORA_A_X:
-					core->checkpageboundary = 1;
-					instr_ora(core, addr_absolute_x);
-					break;
-				case ORA_A_Y:
-					core->checkpageboundary = 1;
-					instr_ora(core, addr_absolute_y);
-					break;
-				case ORA_IND_X:
-					instr_ora(core, addr_indirect_x);
-					break;
-				case ORA_IND_Y:
-					core->checkpageboundary = 1;
-					instr_ora(core, addr_indirect_y);
-					break;
-
-			// Increments/Decrements:
-				case INC_ZPG:
-					instr_inc(core, addr_zeropage);
-					break;
-				case INC_ZPG_X:
-					instr_inc(core, addr_zeropage_x);
-					break;
-				case INC_A:
-					instr_inc(core, addr_absolute);
-					break;
-				case INC_A_X:
-					instr_inc(core, addr_absolute_x);
-					break;
-				case INX:
-					instr_in_(core, &(core->x));
-					break;
-				case INY:
-					instr_in_(core, &(core->y));
-					break;
-				case DEC_ZPG:
-					instr_dec(core, addr_zeropage);
-					break;
-				case DEC_ZPG_X:
-					instr_dec(core, addr_zeropage_x);
-					break;
-				case DEC_A:
-					instr_dec(core, addr_absolute);
-					break;
-				case DEC_A_X:
-					instr_dec(core, addr_absolute_x);
-					break;
-				case DEX:
-					instr_de_(core, &(core->x));
-					break;
-				case DEY:
-					instr_de_(core, &(core->y));
-					break;
-				case BIT_ZPG:
-					instr_bit(core, addr_zeropage);
-					break;
-				case BIT_A:
-					instr_bit(core, addr_absolute);
-					break;
-
-			// Shifts:
-				case ASL_ACC:
-					instr_asl_acc(core);
-					break;
-				case ASL_ZPG:
-					instr_asl(core, addr_zeropage);
-					break;
-				case ASL_ZPG_X:
-					instr_asl(core, addr_zeropage_x);
-					break;
-				case ASL_A:
-					instr_asl(core, addr_absolute);
-					break;
-				case ASL_A_X:
-					instr_asl(core, addr_absolute_x);
-					break;
-
-				case LSR_ACC:
-					instr_lsr_acc(core);
-					break;
-				case LSR_ZPG:
-					instr_lsr(core, addr_zeropage);
-					break;
-				case LSR_ZPG_X:
-					instr_lsr(core, addr_zeropage_x);
-					break;
-				case LSR_A:
-					instr_lsr(core, addr_absolute);
-					break;
-				case LSR_A_X:
-					instr_lsr(core, addr_absolute_x);
-					break;
-
-				case ROL_ACC:
-					instr_rol_acc(core);
-					break;
-				case ROL_ZPG:
-					instr_rol(core, addr_zeropage);
-					break;
-				case ROL_ZPG_X:
-					instr_rol(core, addr_zeropage_x);
-					break;
-				case ROL_A:
-					instr_rol(core, addr_absolute);
-					break;
-				case ROL_A_X:
-					instr_rol(core, addr_absolute_x);
-					break;
-
-				case ROR_ACC:
-					instr_ror_acc(core);
-					break;
-				case ROR_ZPG:
-					instr_ror(core, addr_zeropage);
-					break;
-				case ROR_ZPG_X:
-					instr_ror(core, addr_zeropage_x);
-					break;
-				case ROR_A:
-					instr_ror(core, addr_absolute);
-					break;
-				case ROR_A_X:
-					instr_ror(core, addr_absolute_x);
-					break;
-
-			// Jumps:
-				case JMP_A:
-					instr_jmp(core, addr_absolute);
-					break;
-				case JMP_IND:
-					instr_jmp(core, addr_indirect);
-					break;
-				case JSR_A:
-					instr_jsr(core, addr_absolute);
-					break;
-				case RTS:
-					instr_rts(core);
-					break;
-
-			// Branches:
-				case BCC:
-					instr_bcc(core);
-					break;
-				case BCS:
-					instr_bcs(core);
-					break;
-				case BEQ:
-					instr_beq(core);
-					break;
-				case BMI:
-					instr_bmi(core);
-					break;
-				case BNE:
-					instr_bne(core);
-					break;
-				case BPL:
-					instr_bpl(core);
-					break;
-				case BVS:
-					instr_bvs(core);
-					break;
-				case BVC:
-					instr_bvc(core);
-					break;
-
-			// Flag Sets and Clears:
-				case CLC:
-					core->fcarry = 0;
-					++(core->pc);
-					break;
-				case CLI:
-					core->fintdisable = 0;
-					++(core->pc);
-					break;
-				case CLV:
-					core->foverflow = 0;
-					++(core->pc);
-					break;
-				case SEC:
-					core->fcarry = 1;
-					++(core->pc);
-					break;
-				case SEI:
-					core->fintdisable = 1;
-					++(core->pc);
-					break;
-
-			// Misc:
-				case NOP:
-					++(core->pc);
-					break;
-				case BRK:
-					instr_brk(core);
-					break;
-				case RTI:
-					instr_rti(core);
-					break;
-
-				#if CORE_DEBUG == 1
-				case 0x22:
-					dump_core_state(core);
-					printf("\n");
-					++(core->pc);
-					break;
-				#endif
-
-				default:
-					++(core->pc);
-					break;
-			}
+	// Scaffolding Exit:
+	if (opcode == 0xFF) {
+		return;
 	}
-}
 
-void pg_jmptest(core_t *core) {
+	// todo: Replace with a jump table?
+	switch ( core->ram[core->pc] ) {
 
-	core->ram[0x0000] = JMP_A;
-	core->ram[0x0001] = 0x00;
-	core->ram[0x0002] = 0xC0;
+	// Load/Store:
 
-	core->ram[0xC000] = LDA_ZPG;
-	core->ram[0xC001] = 0x31;
-	core->ram[0xC002] = PHA;
-	core->ram[0xC003] = 0x22;
+		// LDX:
+		case LDX_I:
+			instr_ld(core, &(core->x), addr_immediate);
+			break;
+		case LDX_ZPG:
+			instr_ld(core, &(core->x), addr_zeropage);
+			break;
+		case LDX_ZPG_Y:
+			instr_ld(core, &(core->x), addr_zeropage_y);
+			break;
+		case LDX_A:
+			instr_ld(core, &(core->x), addr_absolute);
+			break;
+		case LDX_A_Y:
+			core->checkpageboundary = 1;
+			instr_ld(core, &(core->x), addr_absolute_y);
+			break;
 
-	core->ram[0xC004] = JSR_A;
-	core->ram[0xC005] = 0xD0;
-	core->ram[0xC006] = 0xDC;
-	core->ram[0xC007] = 0x22; //DEBUG
+		// LDY:
+		case LDY_I:
+			instr_ld(core, &(core->y), addr_immediate);
+			break;
+		case LDY_ZPG:
+			instr_ld(core, &(core->y), addr_zeropage);
+			break;
+		case LDY_ZPG_X:
+			instr_ld(core, &(core->y), addr_zeropage_x);
+			break;
+		case LDY_A:
+			instr_ld(core, &(core->y), addr_absolute);
+			break;
+		case LDY_A_X:
+			core->checkpageboundary = 1;
+			instr_ld(core, &(core->y), addr_absolute_x);
+			break;
 
-	core->ram[0xC008] = 0xFF;
+		// LDA:
+		case LDA_I:
+			instr_ld(core, &(core->a), addr_immediate);
+			break;
+		case LDA_ZPG:
+			instr_ld(core, &(core->a), addr_zeropage);
+			break;
+		case LDA_ZPG_X:
+			instr_ld(core, &(core->a), addr_zeropage_x);
+			break;
+		case LDA_A:
+			instr_ld(core, &(core->a), addr_absolute);
+			break;
+		case LDA_A_X:
+			core->checkpageboundary = 1;
+			instr_ld(core, &(core->a), addr_absolute_x);
+			break;
+		case LDA_A_Y:
+			core->checkpageboundary = 1;
+			instr_ld(core, &(core->a), addr_absolute_y);
+			break;
+		case LDA_IND_X:
+			instr_ld(core, &(core->a), addr_indirect_x);
+			break;
+		case LDA_IND_Y:
+			core->checkpageboundary = 1;
+			instr_ld(core, &(core->a), addr_indirect_y);
+			break;
 
-	core->ram[0xDCD0] = LDA_I;
-	core->ram[0xDCD1] = 0x66;
-	core->ram[0xDCD2] = LDA_I;
-	core->ram[0xDCD3] = 0x67;
-	core->ram[0xDCD4] = 0x22; //DEBUG
-	core->ram[0xDCD5] = RTS;
+		// STA:
+		case STA_ZPG:
+			instr_st(core, &(core->a), addr_zeropage);
+			break;
+		case STA_ZPG_X:
+			instr_st(core, &(core->a), addr_zeropage_x);
+			break;
+		case STA_A:
+			instr_st(core, &(core->a), addr_absolute);
+			break;
+		case STA_A_X:
+			instr_st(core, &(core->a), addr_absolute_x);
+			break;
+		case STA_A_Y:
+			instr_st(core, &(core->a), addr_absolute_y);
+			break;
+		case STA_IND_X:
+			instr_st(core, &(core->a), addr_indirect_x);
+			break;
+		case STA_IND_Y:
+			instr_st(core, &(core->a), addr_indirect_y);
+			break;
 
-	//core->ram[0x000A] = PLA;
-	//core->ram[0x000B] = 0x22;
+		// STX:
+		case STX_ZPG:
+			instr_st(core, &(core->x), addr_zeropage);
+			break;
+		case STX_ZPG_Y:
+			instr_st(core, &(core->x), addr_zeropage_y);
+			break;
+		case STX_A:
+			instr_st(core, &(core->x), addr_absolute);
+			break;
 
-	// .data
-	core->ram[0x0030] = 0x07; 
-	core->ram[0x0031] = 0x09; 
-	core->ram[0x0032] = 0x0A; 
+		// STY:
+		case STY_ZPG:
+			instr_st(core, &(core->y), addr_zeropage);
+			break;
+		case STY_ZPG_X:
+			instr_st(core, &(core->y), addr_zeropage_x);
+			break;
+		case STY_A:
+			instr_st(core, &(core->y), addr_absolute);
+			break;
 
-}
+	// Register Transfers:
+		case TAX:
+			instr_t__(core, &(core->a), &(core->x));
+			break;
+		case TAY:
+			instr_t__(core, &(core->a), &(core->y));
+			break;
+		case TXA:
+			instr_t__(core, &(core->x), &(core->a));
+			break;
+		case TYA:
+			instr_t__(core, &(core->y), &(core->a));
+			break;
 
-int main(void) {
+	// Stack Operations:
+		case TXS:
+			instr_t__(core, &(core->x), &(core->ram[CORE_STACK_ADDRESS(core, 0)]));
+			break;
+		case TSX:
+			instr_t__(core, &(core->ram[CORE_STACK_ADDRESS(core, 0)]), &(core->x));
+			break;
+		case PHA:
+			instr_pha(core);
+			break;
+		case PLA:
+			instr_pla(core);
+			break;
+		case PHP:
+			instr_php(core);
+			break;
+		case PLP:
+			instr_plp(core);
+			break;
 
-	core_t *core = init_core();
+	// Arithmetic Operations:
+		case ADC_I:
+			instr_adc(core, addr_immediate);
+			break;
+		case ADC_ZPG:
+			instr_adc(core, addr_zeropage);
+			break;
+		case ADC_ZPG_X:
+			instr_adc(core, addr_zeropage_x);
+			break;
+		case ADC_A:
+			instr_adc(core, addr_absolute);
+			break;
+		case ADC_A_X:
+			core->checkpageboundary = 1;
+			instr_adc(core, addr_absolute_x);
+			break;
+		case ADC_A_Y:
+			core->checkpageboundary = 1;
+			instr_adc(core, addr_absolute_y);
+			break;
+		case ADC_IND_X:
+			instr_adc(core, addr_indirect_x);
+			break;
+		case ADC_IND_Y:
+			core->checkpageboundary = 1;
+			instr_adc(core, addr_indirect_y);
+			break;
 
-	core->ram[0x0000] = LDX_I;
-	core->ram[0x0001] = 0x03;
-	core->ram[0x0002] = 0x22;
+		case SBC_I:
+			instr_sbc(core, addr_immediate);
+			break;
+		case SBC_ZPG:
+			instr_sbc(core, addr_zeropage);
+			break;
+		case SBC_ZPG_X:
+			instr_sbc(core, addr_zeropage_x);
+			break;
+		case SBC_A:
+			instr_sbc(core, addr_absolute);
+			break;
+		case SBC_A_X:
+			core->checkpageboundary = 1;
+			instr_sbc(core, addr_absolute_x);
+			break;
+		case SBC_A_Y:
+			core->checkpageboundary = 1;
+			instr_sbc(core, addr_absolute_y);
+			break;
+		case SBC_IND_X:
+			instr_sbc(core, addr_indirect_x);
+			break;
+		case SBC_IND_Y:
+			core->checkpageboundary = 1;
+			instr_sbc(core, addr_indirect_y);
+			break;
 
-	core->ram[0x0003] = BRK;
-	core->ram[0x0004] = 0xFF;
+		case CMP_I:
+			instr_cmp(core, &(core->a), addr_immediate);
+			break;
+		case CMP_ZPG:
+			instr_cmp(core, &(core->a), addr_zeropage);
+			break;
+		case CMP_ZPG_X:
+			instr_cmp(core, &(core->a), addr_zeropage_x);
+			break;
+		case CMP_A:
+			instr_cmp(core, &(core->a), addr_absolute);
+			break;
+		case CMP_A_X:
+			core->checkpageboundary = 1;
+			instr_cmp(core, &(core->a), addr_absolute_x);
+			break;
+		case CMP_A_Y:
+			core->checkpageboundary = 1;
+			instr_cmp(core, &(core->a), addr_absolute_y);
+			break;
+		case CMP_IND_X:
+			instr_cmp(core, &(core->a), addr_indirect_x);
+			break;
+		case CMP_IND_Y:
+			core->checkpageboundary = 1;
+			instr_cmp(core, &(core->a), addr_indirect_y);
+			break;
 
-	core->ram[0x3040] = 0x22; 
-	core->ram[0x3041] = 0x22; 
-	core->ram[0x3042] = RTI; // Return From Interrupt
+		case CPX_I:
+			instr_cmp(core, &(core->x), addr_immediate);
+			break;
+		case CPX_ZPG:
+			instr_cmp(core, &(core->x), addr_zeropage);
+			break;
+		case CPX_A:
+			instr_cmp(core, &(core->x), addr_absolute);
+			break;
 
-	// .data
-	core->ram[0xFFFE] = 0x40;
-	core->ram[0xFFFF] = 0x30;
+		case CPY_I:
+			instr_cmp(core, &(core->y), addr_immediate);
+			break;
+		case CPY_ZPG:
+			instr_cmp(core, &(core->y), addr_zeropage);
+			break;
+		case CPY_A:
+			instr_cmp(core, &(core->y), addr_absolute);
+			break;
 
-	exec_core(core);
-	
-	dump_core_state(core);
-	return 0;
+	// Logic Operations:
+		case AND_I:
+			instr_and(core, addr_immediate);
+			break;
+		case AND_ZPG:
+			instr_and(core, addr_zeropage);
+			break;
+		case AND_ZPG_X:
+			instr_and(core, addr_zeropage_x);
+			break;
+		case AND_A:
+			instr_and(core, addr_absolute);
+			break;
+		case AND_A_X:
+			instr_and(core, addr_absolute_x);
+			break;
+		case AND_A_Y:
+			instr_and(core, addr_absolute_y);
+			break;
+		case AND_IND_X:
+			instr_and(core, addr_indirect_x);
+			break;
+		case AND_IND_Y:
+			instr_and(core, addr_indirect_y);
+			break;
+
+		case EOR_I:
+			instr_eor(core, addr_immediate);
+			break;
+		case EOR_ZPG:
+			instr_eor(core, addr_zeropage);
+			break;
+		case EOR_ZPG_X:
+			instr_eor(core, addr_zeropage_x);
+			break;
+		case EOR_A:
+			instr_eor(core, addr_absolute);
+			break;
+		case EOR_A_X:
+			core->checkpageboundary = 1;
+			instr_eor(core, addr_absolute_x);
+			break;
+		case EOR_A_Y:
+			core->checkpageboundary = 1;
+			instr_eor(core, addr_absolute_y);
+			break;
+		case EOR_IND_X:
+			instr_eor(core, addr_indirect_x);
+			break;
+		case EOR_IND_Y:
+			core->checkpageboundary = 1;
+			instr_eor(core, addr_indirect_y);
+			break;
+
+		case ORA_I:
+			instr_ora(core, addr_immediate);
+			break;
+		case ORA_ZPG:
+			instr_ora(core, addr_zeropage);
+			break;
+		case ORA_ZPG_X:
+			instr_ora(core, addr_zeropage_x);
+			break;
+		case ORA_A:
+			instr_ora(core, addr_absolute);
+			break;
+		case ORA_A_X:
+			core->checkpageboundary = 1;
+			instr_ora(core, addr_absolute_x);
+			break;
+		case ORA_A_Y:
+			core->checkpageboundary = 1;
+			instr_ora(core, addr_absolute_y);
+			break;
+		case ORA_IND_X:
+			instr_ora(core, addr_indirect_x);
+			break;
+		case ORA_IND_Y:
+			core->checkpageboundary = 1;
+			instr_ora(core, addr_indirect_y);
+			break;
+
+	// Increments/Decrements:
+		case INC_ZPG:
+			instr_inc(core, addr_zeropage);
+			break;
+		case INC_ZPG_X:
+			instr_inc(core, addr_zeropage_x);
+			break;
+		case INC_A:
+			instr_inc(core, addr_absolute);
+			break;
+		case INC_A_X:
+			instr_inc(core, addr_absolute_x);
+			break;
+		case INX:
+			instr_in_(core, &(core->x));
+			break;
+		case INY:
+			instr_in_(core, &(core->y));
+			break;
+		case DEC_ZPG:
+			instr_dec(core, addr_zeropage);
+			break;
+		case DEC_ZPG_X:
+			instr_dec(core, addr_zeropage_x);
+			break;
+		case DEC_A:
+			instr_dec(core, addr_absolute);
+			break;
+		case DEC_A_X:
+			instr_dec(core, addr_absolute_x);
+			break;
+		case DEX:
+			instr_de_(core, &(core->x));
+			break;
+		case DEY:
+			instr_de_(core, &(core->y));
+			break;
+		case BIT_ZPG:
+			instr_bit(core, addr_zeropage);
+			break;
+		case BIT_A:
+			instr_bit(core, addr_absolute);
+			break;
+
+	// Shifts:
+		case ASL_ACC:
+			instr_asl_acc(core);
+			break;
+		case ASL_ZPG:
+			instr_asl(core, addr_zeropage);
+			break;
+		case ASL_ZPG_X:
+			instr_asl(core, addr_zeropage_x);
+			break;
+		case ASL_A:
+			instr_asl(core, addr_absolute);
+			break;
+		case ASL_A_X:
+			instr_asl(core, addr_absolute_x);
+			break;
+
+		case LSR_ACC:
+			instr_lsr_acc(core);
+			break;
+		case LSR_ZPG:
+			instr_lsr(core, addr_zeropage);
+			break;
+		case LSR_ZPG_X:
+			instr_lsr(core, addr_zeropage_x);
+			break;
+		case LSR_A:
+			instr_lsr(core, addr_absolute);
+			break;
+		case LSR_A_X:
+			instr_lsr(core, addr_absolute_x);
+			break;
+
+		case ROL_ACC:
+			instr_rol_acc(core);
+			break;
+		case ROL_ZPG:
+			instr_rol(core, addr_zeropage);
+			break;
+		case ROL_ZPG_X:
+			instr_rol(core, addr_zeropage_x);
+			break;
+		case ROL_A:
+			instr_rol(core, addr_absolute);
+			break;
+		case ROL_A_X:
+			instr_rol(core, addr_absolute_x);
+			break;
+
+		case ROR_ACC:
+			instr_ror_acc(core);
+			break;
+		case ROR_ZPG:
+			instr_ror(core, addr_zeropage);
+			break;
+		case ROR_ZPG_X:
+			instr_ror(core, addr_zeropage_x);
+			break;
+		case ROR_A:
+			instr_ror(core, addr_absolute);
+			break;
+		case ROR_A_X:
+			instr_ror(core, addr_absolute_x);
+			break;
+
+	// Jumps:
+		case JMP_A:
+			instr_jmp(core, addr_absolute);
+			break;
+		case JMP_IND:
+			instr_jmp(core, addr_indirect);
+			break;
+		case JSR_A:
+			instr_jsr(core, addr_absolute);
+			break;
+		case RTS:
+			instr_rts(core);
+			break;
+
+	// Branches:
+		case BCC:
+			instr_bcc(core);
+			break;
+		case BCS:
+			instr_bcs(core);
+			break;
+		case BEQ:
+			instr_beq(core);
+			break;
+		case BMI:
+			instr_bmi(core);
+			break;
+		case BNE:
+			instr_bne(core);
+			break;
+		case BPL:
+			instr_bpl(core);
+			break;
+		case BVS:
+			instr_bvs(core);
+			break;
+		case BVC:
+			instr_bvc(core);
+			break;
+
+	// Flag Sets and Clears:
+		case CLC:
+			core->fcarry = 0;
+			++(core->pc);
+			break;
+		case CLI:
+			core->fintdisable = 0;
+			++(core->pc);
+			break;
+		case CLV:
+			core->foverflow = 0;
+			++(core->pc);
+			break;
+		case SEC:
+			core->fcarry = 1;
+			++(core->pc);
+			break;
+		case SEI:
+			core->fintdisable = 1;
+			++(core->pc);
+			break;
+
+	// Misc:
+		case NOP:
+			++(core->pc);
+			break;
+		case BRK:
+			instr_brk(core);
+			break;
+		case RTI:
+			instr_rti(core);
+			break;
+
+		#if CORE_DEBUG == 1
+		case 0x22:
+			dump_core_state(core);
+			printf("\n");
+			++(core->pc);
+			break;
+		#endif
+
+		default:
+			++(core->pc);
+			break;
+	}
 }
