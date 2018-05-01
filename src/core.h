@@ -39,6 +39,8 @@
 // Interrupt Macros:
 #define CORE_IRQ_LO	0xFFFE
 #define CORE_IRQ_HI	0xFFFF
+#define CORE_NMI_LO	0xFFFA
+#define CORE_NMI_HI	0xFFFB
 
 // Flag Macros:
 #define FLAG_CARRY	0x01
@@ -240,6 +242,12 @@
 #define BRK		0x00 //To Implement
 #define RTI		0x40
 
+typedef enum {
+	interruptnone,
+	interruptirq,
+	interruptnmi
+} interruptstate_t;
+
 // Struct for our 6502 CPU Core:
 typedef struct core_t {
 
@@ -271,12 +279,10 @@ typedef struct core_t {
 
 	// Ticks:
 	const uint8_t *ticktable; // Opcode Tick Table
-	uint8_t *optick; // Pointer to current ticktable element
-	
 	uint8_t checkpageboundary; // Flag to indicate that a page boundary crossing could cause a penalty:
-	uint8_t tickpenalty; // Penalty to tick count from crossing boundary:
+	uint16_t cyclecount; // Current Cycle Count
 
-	uint64_t cyclecount;
+	interruptstate_t interruptstate;
 
 } core_t;
 

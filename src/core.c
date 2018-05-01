@@ -702,6 +702,79 @@ void instr_rti(core_t *core) {
 
 }
 
+void do_irq(core_t *core) {
+	
+	// No increment of PC
+
+	#if CORE_DEBUG == 1
+		printf("HW INTERRUPT!\n");
+	#endif
+
+	// Push MSB of PC onto Stack:
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = (core->pc >> 8);
+	--(core->sp);
+
+	// Push LSB of PC onto Stack:
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = (core->pc & 0x00FF);
+	--(core->sp);
+	
+	// Push Status onto Stack
+	uint8_t status = 0x00;
+	core->fvect = 0; // Native IRQ, fvect is unset
+	core->falways = 1;
+	status |= (core->fcarry 	<< 0);
+	status |= (core->fzero 		<< 1);
+	status |= (core->fintdisable 	<< 2);
+	status |= (core->fdec 		<< 3);
+	status |= (core->fvect	 	<< 4); // Set Bit 4
+	status |= (core->falways	<< 5);
+	status |= (core->foverflow 	<< 6);
+	status |= (core->fsign		<< 7);
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = status;
+	--(core->sp); // Decrement Stack Pointer
+
+	core->cyclecount += 7;
+
+	// Load our Interrupt handler and set our PC to that value
+	core->pc = (uint16_t)(core->ram[CORE_IRQ_HI] << 8) + core->ram[CORE_IRQ_LO];
+}
+
+void do_nmi(core_t *core) {
+	
+	// No increment of PC
+	#if CORE_DEBUG == 1
+		printf("NMI INTERRUPT!\n");
+	#endif
+
+	// Push MSB of PC onto Stack:
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = (core->pc >> 8);
+	--(core->sp);
+
+	// Push LSB of PC onto Stack:
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = (core->pc & 0x00FF);
+	--(core->sp);
+	
+	// Push Status onto Stack
+	uint8_t status = 0x00;
+	core->fvect = 0; // Native IRQ, fvect is unset
+	core->falways = 1;
+	status |= (core->fcarry 	<< 0);
+	status |= (core->fzero 		<< 1);
+	status |= (core->fintdisable 	<< 2);
+	status |= (core->fdec 		<< 3);
+	status |= (core->fvect	 	<< 4); // Set Bit 4
+	status |= (core->falways	<< 5);
+	status |= (core->foverflow 	<< 6);
+	status |= (core->fsign		<< 7);
+	core->ram[CORE_STACK_ADDRESS(core, 0)] = status;
+	--(core->sp); // Decrement Stack Pointer
+
+	core->cyclecount += 7;
+
+	// Load our Interrupt handler and set our PC to that value
+	core->pc = (uint16_t)(core->ram[CORE_NMI_HI] << 8) + core->ram[CORE_NMI_LO];
+}
+
 // Main excecution cycle and instruction dispatch table:
 void step_core(core_t *core) {
 
@@ -709,6 +782,28 @@ void step_core(core_t *core) {
 
 	// Reset Page Boundary Penalty Counters:
 	core->checkpageboundary = 0;
+
+	// Check for pending irq/nmis:
+	switch ( core->interruptstate ) {
+		case interruptnmi:
+			do_nmi(core);
+			core->interruptstate = interruptnone;
+			#if CORE_DEBUG == 1
+			printf("NMI FINISHED!\n");
+			#endif
+			return;
+
+		case interruptirq:
+			do_irq(core);
+			core->interruptstate = interruptnone;
+			#if CORE_DEBUG == 1
+			printf("HW INTERRUPT FINISHED!\n");
+			#endif
+			return;
+
+		default:
+			break;
+	}
 
 	// Fetch:
 	opcode = core->ram[core->pc];

@@ -1,7 +1,7 @@
 #include "nesblue.h"
 
-//#define NESBLUE_CPU_FREQ 2e6 // 2 Mhz
-#define NESBLUE_CPU_FREQ 100 // 100 Hz 
+#define NESBLUE_CPU_FREQ 2e6 // 2 Mhz
+//#define NESBLUE_CPU_FREQ 100 // 100 Hz 
 #define STEP_DURATION 10e6 // 10 ms
 #define ONE_SECOND 1e9
 
@@ -17,11 +17,24 @@ void nesblue_sleep(void) {
 void run_nesblue(core_t *core) {
 
 	// Evenly spread cycles over the period of a second to achieve NESBLUE_CPU_FREQ:
-        unsigned int cycles_per_step = (NESBLUE_CPU_FREQ / (ONE_SECOND / STEP_DURATION));
+        uint16_t cycles_per_step = (NESBLUE_CPU_FREQ / (ONE_SECOND / STEP_DURATION));
+	printf("Cycles Per Step %d\n", cycles_per_step);
+
         while (1) {
 
 		// Execute CPU Instructions:
 		for ( core->cyclecount %= cycles_per_step; core->cyclecount < cycles_per_step; ) {
+
+			if ( core->cyclecount != interruptnmi ) {
+				if ( core->cyclecount != 0 && (core->cyclecount % 750) == 0 ) {
+					printf("NMI TRIGGERED -- %d\n", core->cyclecount);
+					core->interruptstate = interruptnmi;
+				} else if ( core->cyclecount != 0 && (core->cyclecount % 1423) == 0 ) {
+					printf("TRIGGERED -- %d\n", core->cyclecount);
+					core->interruptstate = interruptirq;
+				}
+			}
+
 			step_core(core);
                 }
 
