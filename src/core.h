@@ -12,6 +12,8 @@
 #define CORE_DEBUG 1
 #define CORE_DEBUG_TIMING 1
 
+#define CORE_NESTEST 1
+
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \
   (byte & 0x80 ? '1' : '0'), \

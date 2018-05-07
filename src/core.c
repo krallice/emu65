@@ -118,6 +118,7 @@ const uint8_t *init_cycle_table(core_t *core) {
 	};
 	return ticktable;
 }
+
 // Initialise the 6502 core:
 core_t *init_core() {
 
@@ -572,12 +573,14 @@ static inline void instr_bcs(core_t *core) {
 	}
 }
 static inline void instr_bne(core_t *core) {
-	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	int8_t rel = (int8_t)(core->ram[addr_immediate(core)]);
+	printf("rel is %.2x\n", rel);
 	if (core->fzero == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
 		++(core->cyclecount);
-		core->pc += rel + 1;
+		core->pc = core->pc + rel + 1;
+		printf("new pc is %.4x\n", core->pc);
 	} else {
 		++(core->pc);
 	}
