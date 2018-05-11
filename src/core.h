@@ -9,8 +9,8 @@
 #include <unistd.h>
 
 // Debug Macros:
-#define CORE_DEBUG 1
-#define CORE_DEBUG_TIMING 1
+#define CORE_DEBUG 0
+#define CORE_DEBUG_TIMING 0
 
 #define CORE_NESTEST 1
 
@@ -285,6 +285,23 @@ typedef struct core_t {
 	uint16_t cyclecount; // Current Cycle Count
 
 	interruptstate_t interruptstate;
+
+		// Debug:
+		uint16_t d_pc;
+		uint8_t d_op;
+
+		uint8_t d_op1_en;
+		uint8_t d_op2_en;
+		uint8_t d_op1;
+		uint8_t d_op2;
+		char d_str[256];
+
+		uint8_t d_a;
+		uint8_t d_x;
+		uint8_t d_y;
+
+		uint8_t d_sp;
+		uint8_t d_p;
 
 } core_t;
 

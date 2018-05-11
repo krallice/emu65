@@ -3,10 +3,20 @@
 // Memory Addressing Modes:
 // Each have a difference method of returning a 16bit Memory Address:
 uint16_t addr_immediate(core_t *core) {
+	#if CORE_NESTEST == 1
+		core->d_op1_en = 1;
+		core->d_op1 = core->ram[core->pc + 1];
+		sprintf(core->d_str, "#$%.2X", core->ram[(core->pc + 1)]);
+	#endif
 	return (uint16_t)(++(core->pc));
 }
 
 uint16_t addr_zeropage(core_t *core) {
+	#if CORE_NESTEST == 1
+		core->d_op1_en = 1;
+		core->d_op1 = core->ram[core->pc + 1];
+		sprintf(core->d_str, "$%.2X = %.2X", core->d_op1, core->ram[(0x00 << 8) + core->ram[(core->pc) + 1]]);
+	#endif
 	return (0x00 << 8) + core->ram[++(core->pc)];
 }
 
@@ -21,6 +31,13 @@ uint16_t addr_zeropage_y(core_t *core) {
 uint16_t addr_absolute(core_t *core) {
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
+	#if CORE_NESTEST == 1
+		core->d_op1_en = 1;
+		core->d_op2_en = 1;
+		core->d_op1 = lsb;
+		core->d_op2 = msb;
+		sprintf(core->d_str, "$%.2X%.2X", msb, lsb);
+	#endif
 	return (msb << 8) + lsb;
 }
 
@@ -128,12 +145,19 @@ core_t *init_core() {
 	// Fill memory with NOPs:
 	core->ram = (uint8_t*)malloc(sizeof(uint8_t)*CORE_RAM_SIZE);
 	memset(core->ram, NOP, sizeof(uint8_t)*CORE_RAM_SIZE);
+	#if CORE_NESTEST == 1
+	memset(core->ram, 0x00, sizeof(uint8_t)*CORE_RAM_SIZE);
+	#endif
 
 	// Init Stack Pointer:
 	core->sp = CORE_STACK_POINTER_INIT;
+	--(core->sp);
+	--(core->sp);
 
 	// Init flag that's always set:
 	core->falways = 1;
+
+	core->fintdisable = 1;
 
 	// Point to our const ticktable:
 	core->ticktable = init_cycle_table(core);
@@ -808,8 +832,32 @@ void step_core(core_t *core) {
 			break;
 	}
 
+
 	// Fetch:
 	opcode = core->ram[core->pc];
+
+	#if CORE_NESTEST == 1
+		core->d_op = opcode;
+		core->d_pc = core->pc;
+
+		core->d_a = core->a;
+		core->d_x = core->x;
+		core->d_y = core->y;
+
+		core->d_sp = core->sp;
+
+		core->d_p |= (core->fcarry 		<< 0);
+		core->d_p |= (core->fzero 		<< 1);
+		core->d_p |= (core->fintdisable 	<< 2);
+		core->d_p |= (core->fdec 		<< 3);
+		core->d_p |= (core->fvect	 	<< 4); // Set Bit 4
+		core->d_p |= (core->falways		<< 5);
+		core->d_p |= (core->foverflow 		<< 6);
+		core->d_p |= (core->fsign		<< 7);
+
+		core->d_pc = core->pc;
+	#endif	
+
 	core->cyclecount += core->ticktable[core->ram[core->pc]];
 
 	// Scaffolding Exit:

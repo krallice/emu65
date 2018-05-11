@@ -7,6 +7,43 @@
 #define STEP_DURATION 10e6 // 10 ms
 #define ONE_SECOND 1e9
 
+char nestestnames[256][4] = {
+    //FUT represents unimplemented op codes
+    "BRK", "ORA", "FUT", "FUT", "FUT", "ORA", "ASL", "FUT",
+    "PHP", "ORA", "ASL", "FUT", "FUT", "ORA", "ASL", "FUT",
+    "BPL", "ORA", "FUT", "FUT", "FUT", "ORA", "ASL", "FUT",
+    "CLC", "ORA", "FUT", "FUT", "FUT", "ORA", "ASL", "FUT",
+    "JSR", "AND", "FUT", "FUT", "BIT", "AND", "ROL", "FUT",
+    "PLP", "AND", "ROL", "FUT", "BIT", "AND", "ROL", "FUT",
+    "BMI", "AND", "FUT", "FUT", "FUT", "AND", "ROL", "FUT",
+    "SEC", "AND", "FUT", "FUT", "FUT", "AND", "ROL", "FUT",
+    "RTI", "EOR", "FUT", "FUT", "FUT", "EOR", "LSR", "FUT",
+    "PHA", "EOR", "LSR", "FUT", "JMP", "EOR", "LSR", "FUT",
+    "BVC", "EOR", "FUT", "FUT", "FUT", "EOR", "LSR", "FUT",
+    "CLI", "EOR", "FUT", "FUT", "FUT", "EOR", "LSR", "FUT",
+    "RTS", "ADC", "FUT", "FUT", "FUT", "ADC", "ROR", "FUT",
+    "PLA", "ADC", "ROR", "FUT", "JMP", "ADC", "ROR", "FUT",
+    "BVS", "ADC", "FUT", "FUT", "FUT", "ADC", "ROR", "FUT",
+    "SEI", "ADC", "FUT", "FUT", "FUT", "ADC", "ROR", "FUT",
+    "FUT", "STA", "FUT", "FUT", "STY", "STA", "STX", "FUT",
+    "DEY", "FUT", "TXA", "FUT", "STY", "STA", "STX", "FUT",
+    "BCC", "STA", "FUT", "FUT", "STY", "STA", "STX", "FUT",
+    "TYA", "STA", "TXS", "FUT", "FUT", "STA", "FUT", "FUT",
+    "LDY", "LDA", "LDX", "FUT", "LDY", "LDA", "LDX", "FUT",
+    "TAY", "LDA", "TAX", "FUT", "LDY", "LDA", "LDX", "FUT",
+    "BCS", "LDA", "FUT", "FUT", "LDY", "LDA", "LDX", "FUT",
+    "CLV", "LDA", "TSX", "FUT", "LDY", "LDA", "LDX", "FUT",
+    "CPY", "CMP", "FUT", "FUT", "CPY", "CMP", "DEC", "FUT",
+    "INY", "CMP", "DEX", "FUT", "CPY", "CMP", "DEC", "FUT",
+    "BNE", "CMP", "FUT", "FUT", "FUT", "CMP", "DEC", "FUT",
+    "CLD", "CMP", "FUT", "FUT", "FUT", "CMP", "DEC", "FUT",
+    "CPX", "SBC", "FUT", "FUT", "CPX", "SBC", "INC", "FUT",
+    "INX", "SBC", "NOP", "FUT", "CPX", "SBC", "INC", "FUT",
+    "BEQ", "SBC", "FUT", "FUT", "FUT", "SBC", "INC", "FUT",
+    "SED", "SBC", "FUT", "FUT", "FUT", "SBC", "INC", "FUT"
+};
+
+
 // NES Structure:
 typedef struct nes_t {
 	core_t *core;
@@ -94,9 +131,66 @@ void load_functional_test(nes_t *nes) {
 	#endif
 
 	// Set our PC to the start of the functional test:
-	core->pc = 0xC000;
+	core->pc = 0x0400;
 
 	fclose(fp);
+}
+
+void print_nestest_diag(nes_t *nes) {
+
+	core_t *core = nes->core;
+
+	// Debug output:
+	printf("%.4X  ", core->d_pc);
+	printf("%.2X ", core->d_op);
+
+	// First Operand:
+	if ( core->d_op1_en != 0 ) {
+		printf("%.2X ", core->d_op1);
+	} else {
+		printf("   ");
+	}
+
+	// Second Operand:
+	if ( core->d_op2_en != 0 ) {
+		printf("%.2X  ", core->d_op2);
+	} else {
+		printf("    ");
+	}
+	
+	printf("%s ", nestestnames[core->d_op]);
+	printf("%s", core->d_str);
+
+	printf("\t\t\t");
+
+	printf("A:%.2X X:%.2X Y:%.2X P:%.2X SP:%.2X", core->d_a, core->d_x, core->d_y,
+							core->d_p, core->d_sp);
+
+	printf("\n");
+
+}
+
+void reset_nestest_diag(nes_t *nes) {
+
+	core_t *core = nes->core;
+
+	// Reset Debugs:
+	strcpy(core->d_str, "     ");
+
+	core->d_op = 0;
+	core->d_op1_en = 0;
+	core->d_op2_en = 0;
+	core->d_op1 = 0;
+	core->d_op2 = 0;
+
+	core->d_a = 0;
+	core->d_x = 0;
+	core->d_y = 0;
+
+	core->d_sp = 0;
+	core->d_p = 0;
+	core->d_pc = 0;
+
 }
 
 void run_nestest(nes_t *nes) {
@@ -104,14 +198,20 @@ void run_nestest(nes_t *nes) {
 	// Evenly spread cycles over the period of a second to achieve NESBLUE_CPU_FREQ:
         uint16_t cycles_per_step = (NESBLUE_CPU_FREQ / (ONE_SECOND / STEP_DURATION));
 	uint16_t total_cycles = 0;
+	
+	core_t *core = nes->core;
 
         while (1) {
 
 		// Execute CPU Instructions:
 		for ( nes->core->cyclecount %= cycles_per_step; nes->core->cyclecount < cycles_per_step; ) {
+
+			// Step through CPU:
+			reset_nestest_diag(nes);
 			step_core(nes->core);
-			total_cycles += nes->core->cyclecount;
-			//printf("Total Cycles: %d\n", total_cycles);
+			print_nestest_diag(nes);
+
+			total_cycles += core->cyclecount;
                 }
 
 		// Sleep the rest of our interval:
