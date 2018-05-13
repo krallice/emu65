@@ -314,14 +314,14 @@ static inline void instr_pla(core_t *core) {
 static inline void instr_php(core_t *core) {
 
 	core->falways = 1; // Reset our always flag
-	core->fvect = 1; // Set if BRK or PHP
+	//core->fvect = 1; // Set if BRK or PHP
 
 	uint8_t status = 0x00;
 	status |= (core->fcarry 	<< 0);
 	status |= (core->fzero 		<< 1);
 	status |= (core->fintdisable 	<< 2);
 	status |= (core->fdec 		<< 3);
-	status |= (core->fvect 		<< 4);
+	status |= ((1)	 		<< 4);
 	status |= (core->falways	<< 5);
 	status |= (core->foverflow 	<< 6);
 	status |= (core->fsign		<< 7);
@@ -347,8 +347,9 @@ static inline void instr_plp(core_t *core) {
 	core->fzero = 		((status >> 1) & 0x01) ? 1 : 0;
 	core->fintdisable = 	((status >> 2) & 0x01) ? 1 : 0;
 	core->fdec = 		((status >> 3) & 0x01) ? 1 : 0;
-	core->fvect =		((status >> 4) & 0x01) ? 1 : 0; // Technically not accurate: http://nesdev.com/the%20'B'%20flag%20&%20BRK%20instruction.txt
-	core->falways =		((status >> 5) & 0x01) ? 1 : 0;
+	//core->fvect =		((status >> 4) & 0x01) ? 1 : 0; // Technically not accurate: http://nesdev.com/the%20'B'%20flag%20&%20BRK%20instruction.txt
+	core->fvect =		0; // Technically not accurate: http://nesdev.com/the%20'B'%20flag%20&%20BRK%20instruction.txt
+	core->falways =		1;
 	core->foverflow = 	((status >> 6) & 0x01) ? 1 : 0;
 	core->fsign =		((status >> 7) & 0x01) ? 1 : 0;
 
@@ -491,7 +492,7 @@ static inline void instr_jmp(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 static inline void instr_jsr(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 
 	uint16_t jsr_address = addr_mode(core);
-	uint16_t rts_address = core->pc - 1;
+	uint16_t rts_address = core->pc;
 
 	uint8_t msb = rts_address >> 8;
 	uint8_t lsb = (rts_address & 0x00FF);
@@ -576,6 +577,9 @@ static inline void instr_sbc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 // Branches:
 static inline void instr_bcc(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	#if CORE_NESTEST == 1
+	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
+	#endif
 	if (core->fcarry == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -587,6 +591,9 @@ static inline void instr_bcc(core_t *core) {
 }
 static inline void instr_bcs(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	#if CORE_NESTEST == 1
+	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
+	#endif
 	if (core->fcarry == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -598,19 +605,23 @@ static inline void instr_bcs(core_t *core) {
 }
 static inline void instr_bne(core_t *core) {
 	int8_t rel = (int8_t)(core->ram[addr_immediate(core)]);
-	printf("rel is %.2x\n", rel);
+	#if CORE_NESTEST == 1
+	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
+	#endif
 	if (core->fzero == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
 		++(core->cyclecount);
 		core->pc = core->pc + rel + 1;
-		printf("new pc is %.4x\n", core->pc);
 	} else {
 		++(core->pc);
 	}
 }
 static inline void instr_beq(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	#if CORE_NESTEST == 1
+	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
+	#endif
 	if (core->fzero == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -622,6 +633,9 @@ static inline void instr_beq(core_t *core) {
 }
 static inline void instr_bpl(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	#if CORE_NESTEST == 1
+	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
+	#endif
 	if (core->fsign == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -633,6 +647,9 @@ static inline void instr_bpl(core_t *core) {
 }
 static inline void instr_bmi(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	#if CORE_NESTEST == 1
+	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
+	#endif
 	if (core->fsign == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -644,6 +661,9 @@ static inline void instr_bmi(core_t *core) {
 }
 static inline void instr_bvc(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	#if CORE_NESTEST == 1
+	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
+	#endif
 	if (core->foverflow == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -655,6 +675,9 @@ static inline void instr_bvc(core_t *core) {
 }
 static inline void instr_bvs(core_t *core) {
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
+	#if CORE_NESTEST == 1
+	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
+	#endif
 	if (core->foverflow == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -1363,12 +1386,20 @@ void step_core(core_t *core) {
 			core->foverflow = 0;
 			++(core->pc);
 			break;
+		case CLD:
+			core->fdec = 0;
+			++(core->pc);
+			break;
 		case SEC:
 			core->fcarry = 1;
 			++(core->pc);
 			break;
 		case SEI:
 			core->fintdisable = 1;
+			++(core->pc);
+			break;
+		case SED:
+			core->fdec = 1;
 			++(core->pc);
 			break;
 

@@ -236,8 +236,10 @@
 #define CLC		0x18
 #define CLI		0x58
 #define CLV		0xB8
+#define CLD		0xD8
 #define SEC		0x38
 #define SEI		0x78
+#define SED		0xF8
 
 // Misc
 #define NOP		0xEA
