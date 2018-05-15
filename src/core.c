@@ -83,11 +83,24 @@ uint16_t addr_indirect(core_t *core) {
 
 uint16_t addr_indirect_x(core_t *core) {
 	// Our pointer to a memory address in the zero page (Modified by X):
-	uint16_t zpg = (0x00 << 8) + (core->ram[++(core->pc)] + core->x);
+
+	uint8_t offset = core->ram[++(core->pc)] + core->x;
+	uint16_t zpg = (0x00 << 8) | offset;
+	uint16_t retval = (core->ram[(zpg+1)&0x00FF] << 8) | core->ram[zpg];
+
+	#if CORE_NESTEST == 1
+		uint8_t base = core->ram[core->pc];
+		core->d_op1_en = 1;
+		core->d_op1 = base;
+
+		char indir_val[64];
+		sprintf(indir_val, " ($%.2X,X) @ %.2X = %.4X = %.2X", base, offset, retval, core->ram[retval]);
+		strcat(core->d_str, indir_val);
+	#endif
 
 	// Our address that the zero page pointer points to:
 	// Todo: Fix any potential roll over issues:
-	return (core->ram[zpg+1] << 8) + core->ram[zpg];
+	return retval;
 }
 
 uint16_t addr_indirect_y(core_t *core) {
@@ -235,7 +248,15 @@ static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(co
 		char absolute_val[32];
 		sprintf(absolute_val, " = %.2X", oldval);
 		strcat(core->d_str, absolute_val);
+	//} else if (addr_mode == addr_indirect_x) {
+
+		
+
+
 	}
+
+
+
 	#endif
 
 
