@@ -269,8 +269,14 @@ static inline void instr_de_(core_t *core, uint8_t *reg) {
 
 // Generic A/X/Y CMP Implementation:
 static inline void instr_cmp(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
-	uint8_t result = *reg - core->ram[addr_mode(core)];
-	core->fcarry = (result >= 0) ? 1 : 0;
+	uint8_t val = core->ram[addr_mode(core)];
+	uint8_t result = *reg - val; 
+	core->fcarry = (*reg >= val) ? 1 : 0;
+	#if CORE_NESTEST == 1
+	//printf("CMP: VAL: %.2X RESULT: %.2X CARRY: %.2X\n", val, result, core->fcarry);
+	#endif
+	//core->fcarry = *reg > (val - (1 - core->fcarry));
+	//core->fcarry = *reg > (val);
 	set_fzero(core, &result);
 	set_fsign(core, &result);
 	++(core->pc);
@@ -528,14 +534,19 @@ static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	// Our value from our memory addressing mode:
 	uint8_t mem = core->ram[addr_mode(core)];
 
+	// Perform our addition:
+	uint8_t sum = core->a + mem + core->fcarry;
+
 	// Set our overflow
 	// ~(a + b) == If the sign bits were the same (inverse of XOR)
 	// & (a ^ sum) == If the sign bits of a+b were different
 	// & 0x80 mask off the highest bit:
-	core->foverflow = (~(core->a ^ (mem + core->fcarry)) & (core->a ^ (core->a + mem + core->fcarry)) & 0x80) ? 1 : 0;
-
-	// Perform our addition:
-	uint8_t sum = core->a + mem + core->fcarry;
+	core->foverflow = (~(core->a ^ mem) & (core->a ^ sum) & 0x80) ? 1 : 0;
+		//#if CORE_NESTEST == 1
+		//if ( core->foverflow == 1 ) {
+			//printf("ADC OVERFLOW\n");
+		//}
+		//#endif
 
 	// Detect a uint8_t wraparound and set carry flag if appropriate
 	core->fcarry = core->a > UCHAR_MAX - (mem + core->fcarry);
@@ -554,17 +565,25 @@ static inline void instr_sbc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	// Our value from our memory addressing mode:
 	uint8_t mem = core->ram[addr_mode(core)];
 
+	// Credit to https://stackoverflow.com/questions/29193303/6502-emulation-proper-way-to-implement-adc-and-sbc
+	mem = ~mem;
+
+	// Perform our addition:
+	uint8_t sum = core->a  + mem + core->fcarry;
+
 	// Set our overflow
 	// ~(a + b) == If the sign bits were the same (inverse of XOR)
 	// & (a ^ sum) == If the sign bits of a+b were different
 	// & 0x80 mask off the highest bit:
-	core->foverflow = (~(core->a ^ (mem - (1 - core->fcarry))) & (core->a ^ (core->a - mem - (1 - core->fcarry))) & 0x80) ? 1 : 0;
-
-	// Perform our addition:
-	uint8_t sum = core->a - mem - (1 - core->fcarry);
+	core->foverflow = (~(core->a ^ mem) & (core->a ^ sum) & 0x80) ? 1 : 0;
+		//#if CORE_NESTEST == 1
+		//if ( core->foverflow == 1 ) {
+			//printf("ADC OVERFLOW\n");
+		//}
+		//#endif
 
 	// Detect a uint8_t wraparound and set carry flag if appropriate
-	core->fcarry = core->a > (mem - (1 - core->fcarry));
+	core->fcarry = core->a > UCHAR_MAX - (mem + core->fcarry);
 
 	core->a = sum;
 

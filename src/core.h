@@ -275,8 +275,8 @@ typedef struct core_t {
 	uint8_t fdec :1; // Unused
 	uint8_t fvect :1; // Clear if Interrupt Vectoring, set if BPK or PHP
 	uint8_t falways :1; // Unused
-        uint8_t fsign :1;
         uint8_t foverflow :1;
+        uint8_t fsign :1;
 
 	// RAM:
 	uint8_t *ram;
