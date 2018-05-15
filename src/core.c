@@ -444,6 +444,9 @@ static inline void instr_bit(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 static inline void instr_asl_acc(core_t *core) {
 	core->fcarry = core->a >> 7;
 	core->a = core->a << 1;
+	#if CORE_NESTEST == 1
+	strcat(core->d_str, "A");
+	#endif 
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -463,6 +466,9 @@ static inline void instr_asl(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 static inline void instr_lsr_acc(core_t *core) {
 	core->fcarry = (core->a & 0x01); // Carry = Bit Zero
 	core->a = core->a >> 1;
+	#if CORE_NESTEST == 1
+	strcat(core->d_str, "A");
+	#endif 
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -484,6 +490,9 @@ static inline void instr_rol_acc(core_t *core) {
 	core->fcarry = core->a >> 7; // Carry = Bit 7
 	core->a = core->a << 1; // Shift Left
 	core->a |= oldcarry; // Bit 0 == Old Carry Value
+	#if CORE_NESTEST == 1
+	strcat(core->d_str, "A");
+	#endif 
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -507,6 +516,9 @@ static inline void instr_ror_acc(core_t *core) {
 	core->fcarry = (core->a & 0x01); // Carry = Bit 1
 	core->a = core->a >> 1; // Shift Left
 	core->a |= (oldcarry << 7); // Bit 7 == Old Carry Value
+	#if CORE_NESTEST == 1
+	strcat(core->d_str, "A");
+	#endif 
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -787,7 +799,7 @@ void instr_rti(core_t *core) {
 	core->fintdisable = 	((status >> 2) & 0x01) ? 1 : 0;
 	core->fdec = 		((status >> 3) & 0x01) ? 1 : 0;
 	core->fvect =		((status >> 4) & 0x01) ? 1 : 0;
-	core->falways =		((status >> 5) & 0x01) ? 1 : 0;
+	core->falways =		(1);
 	core->foverflow = 	((status >> 6) & 0x01) ? 1 : 0;
 	core->fsign =		((status >> 7) & 0x01) ? 1 : 0;
 
