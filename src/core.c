@@ -526,8 +526,8 @@ static inline void instr_rol(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	core->fcarry = core->ram[address] >> 7; // Carry = Bit 7
 	core->ram[address] = core->ram[address] << 1;
 	core->ram[address] |= oldcarry;
-	set_fzero(core, &(core->a));
-	set_fsign(core, &(core->a));
+	set_fzero(core, &(core->ram[address]));
+	set_fsign(core, &(core->ram[address]));
 	++(core->pc);
 }
 
@@ -552,8 +552,8 @@ static inline void instr_ror(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	core->fcarry = (core->ram[address] & 0x01); // Carry = Bit 7
 	core->ram[address] = core->ram[address] >> 1;
 	core->ram[address] |= (oldcarry << 7);
-	set_fzero(core, &(core->a));
-	set_fsign(core, &(core->a));
+	set_fzero(core, &(core->ram[address]));
+	set_fsign(core, &(core->ram[address]));
 	++(core->pc);
 }
 
