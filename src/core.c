@@ -313,13 +313,15 @@ static inline void instr_cmp(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(c
 	uint8_t val = core->ram[addr_mode(core)];
 	uint8_t result = *reg - val; 
 	core->fcarry = (*reg >= val) ? 1 : 0;
-	#if CORE_NESTEST == 1
-	//printf("CMP: VAL: %.2X RESULT: %.2X CARRY: %.2X\n", val, result, core->fcarry);
-	#endif
-	//core->fcarry = *reg > (val - (1 - core->fcarry));
-	//core->fcarry = *reg > (val);
 	set_fzero(core, &result);
 	set_fsign(core, &result);
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", val);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
@@ -418,25 +420,52 @@ static inline void instr_plp(core_t *core) {
 
 // Specific Logical AND Operation:
 static inline void instr_and(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
-	core->a &= core->ram[addr_mode(core)];
+
+	uint8_t mem = core->ram[addr_mode(core)]; 
+	core->a &= mem;
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", mem);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
 // Specific Logical eXclusive OR Operation:
 static inline void instr_eor(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
-	core->a ^= core->ram[addr_mode(core)];
+
+	uint8_t mem = core->ram[addr_mode(core)]; 
+	core->a ^= mem;
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", mem);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
 // Specific Logical OR Operation:
 static inline void instr_ora(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
-	core->a |= core->ram[addr_mode(core)];
+
+	uint8_t mem = core->ram[addr_mode(core)]; 
+	core->a |= mem;
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", mem);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
@@ -452,27 +481,12 @@ static inline void instr_bit(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	((core->a & mem) == 0) ? (core->fzero = 1) : (core->fzero = 0);
 	core->foverflow = ((mem >> 6) & 0x01);
 	core->fsign 	= ((mem >> 7) & 0x01);
-
-	++(core->pc);
-}
-
-// Specific Logical BIT Operation:
-static inline void instr_bit_a(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
-	// Zero Flag - Non Destructive AND between A and M. Set Zero Flag if required.
-	// Don't overwrite A
-	// Overflow Flag - Copied from Memory
-	// Sign Flag - Copied from Memory
-
-	uint8_t mem = core->ram[addr_mode(core)]; 
-
-	((core->a & mem) == 0) ? (core->fzero = 1) : (core->fzero = 0);
-	core->foverflow = ((mem >> 6) & 0x01);
-	core->fsign 	= ((mem >> 7) & 0x01);
-
 #if CORE_NESTEST == 1
-	char indir_val[64];
-	sprintf(indir_val, " = %.2X", mem);
-	strcat(core->d_str, indir_val);
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", mem);
+		strcat(core->d_str, indir_val);
+	}
 #endif
 	++(core->pc);
 }
@@ -638,6 +652,13 @@ static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	// Zero and Sign:
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", mem);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
@@ -672,6 +693,13 @@ static inline void instr_sbc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	// Zero and Sign:
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", ~mem & 0xFF);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
@@ -1366,7 +1394,7 @@ void step_core(core_t *core) {
 			instr_bit(core, addr_zeropage);
 			break;
 		case BIT_A:
-			instr_bit_a(core, addr_absolute);
+			instr_bit(core, addr_absolute);
 			break;
 
 	// Shifts:
