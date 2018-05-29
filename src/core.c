@@ -452,12 +452,28 @@ static inline void instr_bit(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	((core->a & mem) == 0) ? (core->fzero = 1) : (core->fzero = 0);
 	core->foverflow = ((mem >> 6) & 0x01);
 	core->fsign 	= ((mem >> 7) & 0x01);
-	
-	#if CORE_DEBUG == 1
-	printf("BIT: "BYTE_TO_BINARY_PATTERN"\n", 
-			BYTE_TO_BINARY(mem)); 
-	#endif
 
+	++(core->pc);
+}
+
+// Specific Logical BIT Operation:
+static inline void instr_bit_a(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+	// Zero Flag - Non Destructive AND between A and M. Set Zero Flag if required.
+	// Don't overwrite A
+	// Overflow Flag - Copied from Memory
+	// Sign Flag - Copied from Memory
+
+	uint8_t mem = core->ram[addr_mode(core)]; 
+
+	((core->a & mem) == 0) ? (core->fzero = 1) : (core->fzero = 0);
+	core->foverflow = ((mem >> 6) & 0x01);
+	core->fsign 	= ((mem >> 7) & 0x01);
+
+#if CORE_NESTEST == 1
+	char indir_val[64];
+	sprintf(indir_val, " = %.2X", mem);
+	strcat(core->d_str, indir_val);
+#endif
 	++(core->pc);
 }
 
@@ -1350,7 +1366,7 @@ void step_core(core_t *core) {
 			instr_bit(core, addr_zeropage);
 			break;
 		case BIT_A:
-			instr_bit(core, addr_absolute);
+			instr_bit_a(core, addr_absolute);
 			break;
 
 	// Shifts:
