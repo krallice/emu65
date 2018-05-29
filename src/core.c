@@ -332,6 +332,13 @@ static inline void instr_inc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t newval = ++(core->ram[addr_mode(core)]);
 	set_fzero(core, &(newval));
 	set_fsign(core, &(newval));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", (newval - 1) & 0xFF);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
@@ -340,6 +347,13 @@ static inline void instr_dec(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t newval = --(core->ram[addr_mode(core)]);
 	set_fzero(core, &(newval));
 	set_fsign(core, &(newval));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", (newval + 1) & 0xFF);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
@@ -506,10 +520,18 @@ static inline void instr_asl_acc(core_t *core) {
 // Specific ASL for Memory Address:
 static inline void instr_asl(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	uint16_t address = addr_mode(core);
+	uint8_t mem = core->ram[address];
 	core->fcarry = core->ram[address] >> 7;
 	core->ram[address] = core->ram[address] << 1;
 	set_fzero(core, &(core->ram[address]));
 	set_fsign(core, &(core->ram[address]));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", mem);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
@@ -528,10 +550,18 @@ static inline void instr_lsr_acc(core_t *core) {
 // Specific LSR for Memory Address:
 static inline void instr_lsr(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	uint16_t address = addr_mode(core);
+	uint8_t mem = core->ram[address];
 	core->fcarry = (core->ram[address] & 0x01); // Carry = Bit Zero
 	core->ram[address] = core->ram[address] >> 1;
 	set_fzero(core, &(core->ram[address]));
 	set_fsign(core, &(core->ram[address]));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", mem);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
@@ -552,12 +582,20 @@ static inline void instr_rol_acc(core_t *core) {
 // Specific ROL for Memory Address:
 static inline void instr_rol(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	uint16_t address = addr_mode(core);
+	uint8_t mem = core->ram[address];
 	uint8_t oldcarry = core->fcarry;
 	core->fcarry = core->ram[address] >> 7; // Carry = Bit 7
 	core->ram[address] = core->ram[address] << 1;
 	core->ram[address] |= oldcarry;
 	set_fzero(core, &(core->ram[address]));
 	set_fsign(core, &(core->ram[address]));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", mem);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
@@ -578,12 +616,20 @@ static inline void instr_ror_acc(core_t *core) {
 // Specific ROR for Memory Address:
 static inline void instr_ror(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	uint16_t address = addr_mode(core);
+	uint8_t mem = core->ram[address];
 	uint8_t oldcarry = core->fcarry;
 	core->fcarry = (core->ram[address] & 0x01); // Carry = Bit 7
 	core->ram[address] = core->ram[address] >> 1;
 	core->ram[address] |= (oldcarry << 7);
 	set_fzero(core, &(core->ram[address]));
 	set_fsign(core, &(core->ram[address]));
+#if CORE_NESTEST == 1
+	if (addr_mode == addr_absolute) {
+		char indir_val[64];
+		sprintf(indir_val, " = %.2X", mem);
+		strcat(core->d_str, indir_val);
+	}
+#endif
 	++(core->pc);
 }
 
