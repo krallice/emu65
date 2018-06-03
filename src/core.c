@@ -21,7 +21,18 @@ uint16_t addr_zeropage(core_t *core) {
 }
 
 uint16_t addr_zeropage_x(core_t *core) {
-	return (0x00 << 8) + core->ram[++(core->pc)] + core->x;
+
+	uint8_t zp = core->ram[++(core->pc)];
+	uint16_t ret = (0x00 << 8) + ((zp + core->x) & 0x00FF);
+
+#if CORE_NESTEST == 1
+	core->d_op1_en = 1;
+	core->d_op1 = zp;
+	char debug_str[64];
+	sprintf(debug_str, "$%.2X,X @ %.2X = %.2X", zp, ret, core->ram[ret]);
+	strcat(core->d_str, debug_str);
+#endif
+	return ret;
 }
 
 uint16_t addr_zeropage_y(core_t *core) {
@@ -29,8 +40,10 @@ uint16_t addr_zeropage_y(core_t *core) {
 }
 
 uint16_t addr_absolute(core_t *core) {
+
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
+
 	#if CORE_NESTEST == 1
 		core->d_op1_en = 1;
 		core->d_op2_en = 1;
@@ -47,9 +60,6 @@ uint16_t addr_absolute_x(core_t *core) {
 	uint16_t ret = ((msb << 8) + lsb) + core->x;
 	if ( core->checkpageboundary == 1 )
 		if ((ret & 0xFF00) != (msb << 8)) {
-			#if CORE_DEBUG_TIMING == 1
-			printf("Page Boundary Cross Penalty\n");
-			#endif
 			++(core->cyclecount);
 		}
 	return ret;
@@ -58,12 +68,20 @@ uint16_t addr_absolute_x(core_t *core) {
 uint16_t addr_absolute_y(core_t *core) {
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
-	uint16_t ret = ((msb << 8) + lsb) + core->y;
+	uint16_t before_ret = ((msb << 8) + lsb);
+	uint16_t ret = before_ret + core->y;
+	
+#if CORE_NESTEST == 1
+	core->d_op1_en = 1;
+	core->d_op1 = lsb;
+	core->d_op2_en = 1;
+	core->d_op2 = msb;
+	char absolute_val[64];
+	sprintf(absolute_val, "$%.4X,Y @ %.4X = %.2X", before_ret, ret, core->ram[ret]);
+	strcat(core->d_str, absolute_val);
+#endif
 	if ( core->checkpageboundary == 1 )
 		if ((ret & 0xFF00) != (msb << 8)) {
-			#if CORE_DEBUG_TIMING == 1
-			printf("Page Boundary Cross Penalty\n");
-			#endif
 			++(core->cyclecount);
 		}
 	return ret;
@@ -75,8 +93,21 @@ uint16_t addr_indirect(core_t *core) {
 	uint8_t msb = core->ram[++(core->pc)];
 	uint16_t indirect = ((msb << 8) + lsb);
 
+	// Final MSB Bug in hardware, if we roll from yyFF to yz01, roll to yy01 instead:
 	uint8_t final_lsb = core->ram[indirect];
-	uint8_t final_msb = core->ram[indirect+1];
+	uint8_t final_msb = core->ram[(indirect & 0xFF00) + ((indirect + 1) & 0x00FF)];
+
+	uint16_t return_addy = (final_msb << 8) + final_lsb;
+
+#if CORE_NESTEST == 1
+	char indir_val[64];
+	core->d_op1_en = 1;
+	core->d_op1 = lsb;
+	core->d_op2_en = 1;
+	core->d_op2 = msb;
+	sprintf(indir_val, "($%.4X) = %.4X", indirect, return_addy);
+	strcat(core->d_str, indir_val);
+#endif
 
 	return ((final_msb << 8) + final_lsb);
 }
@@ -110,7 +141,7 @@ uint16_t addr_indirect_y(core_t *core) {
 
 	// Address located in Zero page which points to our final target (Modified by Y):
 	uint16_t before_ret = ((core->ram[(zpg+1) % 0x0100] << 8) + core->ram[zpg]);
-	uint16_t ret = ((core->ram[(zpg+1) % 0x0100] << 8) + core->ram[zpg]) + core->y;
+	uint16_t ret = before_ret + core->y;
 	
 #if CORE_NESTEST == 1
 	core->d_op1_en = 1;
@@ -634,6 +665,7 @@ static inline void instr_ror(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 }
 
 static inline void instr_jmp(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+
 	core->pc = addr_mode(core);
 }
 
