@@ -109,21 +109,25 @@ uint16_t addr_indirect_y(core_t *core) {
 	uint16_t zpg = (0x00 << 8) + (core->ram[++(core->pc)]);
 
 	// Address located in Zero page which points to our final target (Modified by Y):
-	uint16_t ret = ((core->ram[zpg+1] << 8) + core->ram[zpg]) + core->y;
+	uint16_t before_ret = ((core->ram[(zpg+1) % 0x0100] << 8) + core->ram[zpg]);
+	uint16_t ret = ((core->ram[(zpg+1) % 0x0100] << 8) + core->ram[zpg]) + core->y;
+	
+#if CORE_NESTEST == 1
+	core->d_op1_en = 1;
+	core->d_op1 = core->ram[core->pc];
+	char absolute_val[64];
+	sprintf(absolute_val, "($%.2X),Y = %.4X @ %.4X = %.2X", core->ram[core->pc], before_ret, ret, core->ram[ret]);
+	strcat(core->d_str, absolute_val);
+#endif
 
 	// Check Page Boundary Penalty:
 	if ( core->checkpageboundary == 1 )
 		if ((ret & 0xFF00) != (0x0000)) {
-			#if CORE_DEBUG_TIMING == 1
-			printf("Page Boundary Cross Penalty\n");
-			#endif
 			++(core->cyclecount);
 		}
 
 	return ret;
 }
-
-// Todo: addr_relative(core_t *core)
 
 const uint8_t *init_cycle_table(core_t *core) {
 
@@ -248,17 +252,13 @@ static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(co
 		char absolute_val[32];
 		sprintf(absolute_val, " = %.2X", oldval);
 		strcat(core->d_str, absolute_val);
-	//} else if (addr_mode == addr_indirect_x) {
-
-		
-
-
+	} else if (addr_mode == addr_indirect_y) {
+		//uint8_t oldval = core->ram[addy];
+		//char absolute_val[32];
+		//sprintf(absolute_val, "($%.2X),Y = ", oldval);
+		//strcat(core->d_str, absolute_val);
 	}
-
-
-
 	#endif
-
 
 	*reg = core->ram[addy];
 	set_fzero(core, reg);
