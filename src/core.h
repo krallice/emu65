@@ -246,6 +246,33 @@
 #define BRK		0x00 //To Implement
 #define RTI		0x40
 
+// Unofficials
+#define NOP_3_1		0x1C
+#define NOP_3_2		0x3C
+#define NOP_3_3		0x5C
+#define NOP_3_4		0x7C
+#define NOP_3_5		0xDC
+#define NOP_3_6		0xFC
+#define NOP_3_7		0x0C
+
+#define NOP_2_1		0x14
+#define NOP_2_2		0x34
+#define NOP_2_3		0x54
+#define NOP_2_4		0x74
+#define NOP_2_5		0xD4
+#define NOP_2_6		0xF4
+#define NOP_2_7		0x04
+#define NOP_2_8		0x44
+#define NOP_2_9		0x64
+
+#define NOP_1_1		0x1A
+#define NOP_1_2		0x3A
+#define NOP_1_3		0x5A
+#define NOP_1_4		0x7A
+#define NOP_1_5		0xDA
+#define NOP_1_6		0xFA
+#define NOP_1_7		0x0A
+
 typedef enum {
 	interruptnone,
 	interruptirq,

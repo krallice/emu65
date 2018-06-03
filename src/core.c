@@ -1643,13 +1643,173 @@ void step_core(core_t *core) {
 			instr_rti(core);
 			break;
 
-		#if CORE_DEBUG == 1
-		case 0x22:
-			dump_core_state(core);
-			printf("\n");
-			++(core->pc);
+	// Catch our Unofficial NOPs:
+	
+		case NOP_3_1:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+			core->d_op2_en = 1;
+			core->d_op2 = core->ram[core->pc + 2];
+#endif
+			core->pc += 3;
 			break;
-		#endif
+
+		case NOP_3_2:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+			core->d_op2_en = 1;
+			core->d_op2 = core->ram[core->pc + 2];
+#endif
+			core->pc += 3;
+			break;
+
+		case NOP_3_3:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+			core->d_op2_en = 1;
+			core->d_op2 = core->ram[core->pc + 2];
+#endif
+			core->pc += 3;
+			break;
+
+		case NOP_3_4:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+			core->d_op2_en = 1;
+			core->d_op2 = core->ram[core->pc + 2];
+#endif
+			core->pc += 3;
+			break;
+
+		case NOP_3_5:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+			core->d_op2_en = 1;
+			core->d_op2 = core->ram[core->pc + 2];
+#endif
+			core->pc += 3;
+			break;
+
+		case NOP_3_6:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+			core->d_op2_en = 1;
+			core->d_op2 = core->ram[core->pc + 2];
+#endif
+			core->pc += 3;
+			break;
+
+		case NOP_3_7:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+			core->d_op2_en = 1;
+			core->d_op2 = core->ram[core->pc + 2];
+#endif
+			core->pc += 3;
+			break;
+
+		case NOP_2_1:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+#endif
+			core->pc += 2;
+			break;
+
+		case NOP_2_2:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+#endif
+			core->pc += 2;
+			break;
+
+		case NOP_2_3:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+#endif
+			core->pc += 2;
+			break;
+
+		case NOP_2_4:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+#endif
+			core->pc += 2;
+			break;
+
+		case NOP_2_5:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+#endif
+			core->pc += 2;
+			break;
+
+		case NOP_2_6:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+#endif
+			core->pc += 2;
+			break;
+
+		case NOP_2_7:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+#endif
+			core->pc += 2;
+			break;
+
+		case NOP_2_8:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+#endif
+			core->pc += 2;
+			break;
+
+		case NOP_2_9:
+#if CORE_NESTEST == 1
+			core->d_op1_en = 1;
+			core->d_op1 = core->ram[core->pc + 1];
+#endif
+			core->pc += 2;
+			break;
+
+		case NOP_1_1:
+			core->pc += 1;
+			break;
+
+		case NOP_1_2:
+			core->pc += 1;
+			break;
+
+		case NOP_1_3:
+			core->pc += 1;
+			break;
+
+		case NOP_1_4:
+			core->pc += 1;
+			break;
+
+		case NOP_1_5:
+			core->pc += 1;
+			break;
+
+		case NOP_1_6:
+			core->pc += 1;
+			break;
 
 		default:
 			++(core->pc);
