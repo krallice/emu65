@@ -36,7 +36,18 @@ uint16_t addr_zeropage_x(core_t *core) {
 }
 
 uint16_t addr_zeropage_y(core_t *core) {
-	return (0x00 << 8) + core->ram[++(core->pc)] + core->y;
+
+	uint8_t zp = core->ram[++(core->pc)];
+	uint16_t ret = (0x00 << 8) + ((zp + core->y) & 0x00FF);
+
+#if CORE_NESTEST == 1
+	core->d_op1_en = 1;
+	core->d_op1 = zp;
+	char debug_str[64];
+	sprintf(debug_str, "$%.2X,Y @ %.2X = %.2X", zp, ret, core->ram[ret]);
+	strcat(core->d_str, debug_str);
+#endif
+	return ret;
 }
 
 uint16_t addr_absolute(core_t *core) {
@@ -58,6 +69,17 @@ uint16_t addr_absolute_x(core_t *core) {
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
 	uint16_t ret = ((msb << 8) + lsb) + core->x;
+
+	#if CORE_NESTEST == 1
+		core->d_op1_en = 1;
+		core->d_op2_en = 1;
+		core->d_op1 = lsb;
+		core->d_op2 = msb;
+		char debug_str[64];
+		sprintf(debug_str, "$%.4X,X @ %.4X = %.2X", (msb << 8) + lsb, ret, core->ram[ret]);
+		strcat(core->d_str, debug_str);
+	#endif
+
 	if ( core->checkpageboundary == 1 )
 		if ((ret & 0xFF00) != (msb << 8)) {
 			++(core->cyclecount);
