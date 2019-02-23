@@ -3,65 +3,28 @@
 // Memory Addressing Modes:
 // Each have a difference method of returning a 16bit Memory Address:
 uint16_t addr_immediate(core_t *core) {
-	#if CORE_NESTEST == 1
-		core->d_op1_en = 1;
-		core->d_op1 = core->ram[core->pc + 1];
-		sprintf(core->d_str, "#$%.2X", core->ram[(core->pc + 1)]);
-	#endif
 	return (uint16_t)(++(core->pc));
 }
 
 uint16_t addr_zeropage(core_t *core) {
-	#if CORE_NESTEST == 1
-		core->d_op1_en = 1;
-		core->d_op1 = core->ram[core->pc + 1];
-		sprintf(core->d_str, "$%.2X = %.2X", core->d_op1, core->ram[(0x00 << 8) + core->ram[(core->pc) + 1]]);
-	#endif
 	return (0x00 << 8) + core->ram[++(core->pc)];
 }
 
 uint16_t addr_zeropage_x(core_t *core) {
-
 	uint8_t zp = core->ram[++(core->pc)];
 	uint16_t ret = (0x00 << 8) + ((zp + core->x) & 0x00FF);
-
-#if CORE_NESTEST == 1
-	core->d_op1_en = 1;
-	core->d_op1 = zp;
-	char debug_str[64];
-	sprintf(debug_str, "$%.2X,X @ %.2X = %.2X", zp, ret, core->ram[ret]);
-	strcat(core->d_str, debug_str);
-#endif
 	return ret;
 }
 
 uint16_t addr_zeropage_y(core_t *core) {
-
 	uint8_t zp = core->ram[++(core->pc)];
 	uint16_t ret = (0x00 << 8) + ((zp + core->y) & 0x00FF);
-
-#if CORE_NESTEST == 1
-	core->d_op1_en = 1;
-	core->d_op1 = zp;
-	char debug_str[64];
-	sprintf(debug_str, "$%.2X,Y @ %.2X = %.2X", zp, ret, core->ram[ret]);
-	strcat(core->d_str, debug_str);
-#endif
 	return ret;
 }
 
 uint16_t addr_absolute(core_t *core) {
-
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
-
-	#if CORE_NESTEST == 1
-		core->d_op1_en = 1;
-		core->d_op2_en = 1;
-		core->d_op1 = lsb;
-		core->d_op2 = msb;
-		sprintf(core->d_str, "$%.2X%.2X", msb, lsb);
-	#endif
 	return (msb << 8) + lsb;
 }
 
@@ -69,16 +32,6 @@ uint16_t addr_absolute_x(core_t *core) {
 	uint8_t lsb = core->ram[++(core->pc)];
 	uint8_t msb = core->ram[++(core->pc)];
 	uint16_t ret = ((msb << 8) + lsb) + core->x;
-
-	#if CORE_NESTEST == 1
-		core->d_op1_en = 1;
-		core->d_op2_en = 1;
-		core->d_op1 = lsb;
-		core->d_op2 = msb;
-		char debug_str[64];
-		sprintf(debug_str, "$%.4X,X @ %.4X = %.2X", (msb << 8) + lsb, ret, core->ram[ret]);
-		strcat(core->d_str, debug_str);
-	#endif
 
 	if ( core->checkpageboundary == 1 )
 		if ((ret & 0xFF00) != (msb << 8)) {
@@ -92,16 +45,7 @@ uint16_t addr_absolute_y(core_t *core) {
 	uint8_t msb = core->ram[++(core->pc)];
 	uint16_t before_ret = ((msb << 8) + lsb);
 	uint16_t ret = before_ret + core->y;
-	
-#if CORE_NESTEST == 1
-	core->d_op1_en = 1;
-	core->d_op1 = lsb;
-	core->d_op2_en = 1;
-	core->d_op2 = msb;
-	char absolute_val[64];
-	sprintf(absolute_val, "$%.4X,Y @ %.4X = %.2X", before_ret, ret, core->ram[ret]);
-	strcat(core->d_str, absolute_val);
-#endif
+
 	if ( core->checkpageboundary == 1 )
 		if ((ret & 0xFF00) != (msb << 8)) {
 			++(core->cyclecount);
@@ -119,18 +63,6 @@ uint16_t addr_indirect(core_t *core) {
 	uint8_t final_lsb = core->ram[indirect];
 	uint8_t final_msb = core->ram[(indirect & 0xFF00) + ((indirect + 1) & 0x00FF)];
 
-	uint16_t return_addy = (final_msb << 8) + final_lsb;
-
-#if CORE_NESTEST == 1
-	char indir_val[64];
-	core->d_op1_en = 1;
-	core->d_op1 = lsb;
-	core->d_op2_en = 1;
-	core->d_op2 = msb;
-	sprintf(indir_val, "($%.4X) = %.4X", indirect, return_addy);
-	strcat(core->d_str, indir_val);
-#endif
-
 	return ((final_msb << 8) + final_lsb);
 }
 
@@ -140,16 +72,6 @@ uint16_t addr_indirect_x(core_t *core) {
 	uint8_t offset = core->ram[++(core->pc)] + core->x;
 	uint16_t zpg = (0x00 << 8) | offset;
 	uint16_t retval = (core->ram[(zpg+1)&0x00FF] << 8) | core->ram[zpg];
-
-	#if CORE_NESTEST == 1
-		uint8_t base = core->ram[core->pc];
-		core->d_op1_en = 1;
-		core->d_op1 = base;
-
-		char indir_val[64];
-		sprintf(indir_val, " ($%.2X,X) @ %.2X = %.4X = %.2X", base, offset, retval, core->ram[retval]);
-		strcat(core->d_str, indir_val);
-	#endif
 
 	// Our address that the zero page pointer points to:
 	// Todo: Fix any potential roll over issues:
@@ -165,14 +87,6 @@ uint16_t addr_indirect_y(core_t *core) {
 	uint16_t before_ret = ((core->ram[(zpg+1) % 0x0100] << 8) + core->ram[zpg]);
 	uint16_t ret = before_ret + core->y;
 	
-#if CORE_NESTEST == 1
-	core->d_op1_en = 1;
-	core->d_op1 = core->ram[core->pc];
-	char absolute_val[64];
-	sprintf(absolute_val, "($%.2X),Y = %.4X @ %.4X = %.2X", core->ram[core->pc], before_ret, ret, core->ram[ret]);
-	strcat(core->d_str, absolute_val);
-#endif
-
 	// Check Page Boundary Penalty:
 	if ( core->checkpageboundary == 1 )
 		if ((ret & 0xFF00) != (0x0000)) {
@@ -215,9 +129,6 @@ core_t *init_core() {
 	// Fill memory with NOPs:
 	core->ram = (uint8_t*)malloc(sizeof(uint8_t)*CORE_RAM_SIZE);
 	memset(core->ram, NOP, sizeof(uint8_t)*CORE_RAM_SIZE);
-	#if CORE_NESTEST == 1
-	memset(core->ram, 0x00, sizeof(uint8_t)*CORE_RAM_SIZE);
-	#endif
 
 	// Init Stack Pointer:
 	core->sp = CORE_STACK_POINTER_INIT;
@@ -299,20 +210,6 @@ static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(co
 
 	uint16_t addy = addr_mode(core);
 
-	#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		uint8_t oldval = core->ram[addy];
-		char absolute_val[32];
-		sprintf(absolute_val, " = %.2X", oldval);
-		strcat(core->d_str, absolute_val);
-	} else if (addr_mode == addr_indirect_y) {
-		//uint8_t oldval = core->ram[addy];
-		//char absolute_val[32];
-		//sprintf(absolute_val, "($%.2X),Y = ", oldval);
-		//strcat(core->d_str, absolute_val);
-	}
-	#endif
-
 	*reg = core->ram[addy];
 	set_fzero(core, reg);
 	set_fsign(core, reg);
@@ -323,15 +220,6 @@ static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(co
 static inline void instr_st(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
 
 	uint16_t addy = addr_mode(core);
-
-	#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		uint8_t oldval = core->ram[addy];
-		char absolute_val[32];
-		sprintf(absolute_val, " = %.2X", oldval);
-		strcat(core->d_str, absolute_val);
-	}
-	#endif
 
 	core->ram[addy] = *reg;
 	++(core->pc);
@@ -368,13 +256,6 @@ static inline void instr_cmp(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(c
 	core->fcarry = (*reg >= val) ? 1 : 0;
 	set_fzero(core, &result);
 	set_fsign(core, &result);
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", val);
-		strcat(core->d_str, indir_val);
-	}
-#endif
 	++(core->pc);
 }
 
@@ -385,13 +266,6 @@ static inline void instr_inc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t newval = ++(core->ram[addr_mode(core)]);
 	set_fzero(core, &(newval));
 	set_fsign(core, &(newval));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", (newval - 1) & 0xFF);
-		strcat(core->d_str, indir_val);
-	}
-#endif
 	++(core->pc);
 }
 
@@ -400,13 +274,6 @@ static inline void instr_dec(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	uint8_t newval = --(core->ram[addr_mode(core)]);
 	set_fzero(core, &(newval));
 	set_fsign(core, &(newval));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", (newval + 1) & 0xFF);
-		strcat(core->d_str, indir_val);
-	}
-#endif
 	++(core->pc);
 }
 
@@ -455,11 +322,6 @@ static inline void instr_php(core_t *core) {
 	status |= (core->foverflow 	<< 6);
 	status |= (core->fsign		<< 7);
 
-	#if CORE_DEBUG == 1
-	printf("Zero Flag: %.2X\n", core->fzero);
-	printf("Status Word: %.2X\n", status);
-	#endif
-
 	core->ram[CORE_STACK_ADDRESS(core, 0)] = status;
 	--(core->sp); // Decrement Stack Pointer
 
@@ -492,13 +354,6 @@ static inline void instr_and(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	core->a &= mem;
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", mem);
-		strcat(core->d_str, indir_val);
-	}
-#endif
 	++(core->pc);
 }
 
@@ -509,13 +364,6 @@ static inline void instr_eor(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	core->a ^= mem;
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", mem);
-		strcat(core->d_str, indir_val);
-	}
-#endif
 	++(core->pc);
 }
 
@@ -526,13 +374,6 @@ static inline void instr_ora(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	core->a |= mem;
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", mem);
-		strcat(core->d_str, indir_val);
-	}
-#endif
 	++(core->pc);
 }
 
@@ -548,13 +389,6 @@ static inline void instr_bit(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	((core->a & mem) == 0) ? (core->fzero = 1) : (core->fzero = 0);
 	core->foverflow = ((mem >> 6) & 0x01);
 	core->fsign 	= ((mem >> 7) & 0x01);
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", mem);
-		strcat(core->d_str, indir_val);
-	}
-#endif
 	++(core->pc);
 }
 
@@ -562,9 +396,6 @@ static inline void instr_bit(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 static inline void instr_asl_acc(core_t *core) {
 	core->fcarry = core->a >> 7;
 	core->a = core->a << 1;
-	#if CORE_NESTEST == 1
-	strcat(core->d_str, "A");
-	#endif 
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -573,18 +404,10 @@ static inline void instr_asl_acc(core_t *core) {
 // Specific ASL for Memory Address:
 static inline void instr_asl(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
 	uint16_t address = addr_mode(core);
-	uint8_t mem = core->ram[address];
 	core->fcarry = core->ram[address] >> 7;
 	core->ram[address] = core->ram[address] << 1;
 	set_fzero(core, &(core->ram[address]));
 	set_fsign(core, &(core->ram[address]));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", mem);
-		strcat(core->d_str, indir_val);
-	}
-#endif
 	++(core->pc);
 }
 
@@ -592,9 +415,6 @@ static inline void instr_asl(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 static inline void instr_lsr_acc(core_t *core) {
 	core->fcarry = (core->a & 0x01); // Carry = Bit Zero
 	core->a = core->a >> 1;
-	#if CORE_NESTEST == 1
-	strcat(core->d_str, "A");
-	#endif 
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
 	++(core->pc);
@@ -602,87 +422,72 @@ static inline void instr_lsr_acc(core_t *core) {
 
 // Specific LSR for Memory Address:
 static inline void instr_lsr(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+
 	uint16_t address = addr_mode(core);
-	uint8_t mem = core->ram[address];
+
 	core->fcarry = (core->ram[address] & 0x01); // Carry = Bit Zero
 	core->ram[address] = core->ram[address] >> 1;
 	set_fzero(core, &(core->ram[address]));
 	set_fsign(core, &(core->ram[address]));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", mem);
-		strcat(core->d_str, indir_val);
-	}
-#endif
+
 	++(core->pc);
 }
 
 // Specific ROL for Accumulator
 static inline void instr_rol_acc(core_t *core) {
+
 	uint8_t oldcarry = core->fcarry;
+
 	core->fcarry = core->a >> 7; // Carry = Bit 7
 	core->a = core->a << 1; // Shift Left
 	core->a |= oldcarry; // Bit 0 == Old Carry Value
-	#if CORE_NESTEST == 1
-	strcat(core->d_str, "A");
-	#endif 
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
+
 	++(core->pc);
 }
 
 // Specific ROL for Memory Address:
 static inline void instr_rol(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+
 	uint16_t address = addr_mode(core);
-	uint8_t mem = core->ram[address];
 	uint8_t oldcarry = core->fcarry;
+
 	core->fcarry = core->ram[address] >> 7; // Carry = Bit 7
 	core->ram[address] = core->ram[address] << 1;
 	core->ram[address] |= oldcarry;
 	set_fzero(core, &(core->ram[address]));
 	set_fsign(core, &(core->ram[address]));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", mem);
-		strcat(core->d_str, indir_val);
-	}
-#endif
+
 	++(core->pc);
 }
 
 // Specific ROR for Accumulator:
 static inline void instr_ror_acc(core_t *core) {
+
 	uint8_t oldcarry = core->fcarry;
+
 	core->fcarry = (core->a & 0x01); // Carry = Bit 1
 	core->a = core->a >> 1; // Shift Left
 	core->a |= (oldcarry << 7); // Bit 7 == Old Carry Value
-	#if CORE_NESTEST == 1
-	strcat(core->d_str, "A");
-	#endif 
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
+
 	++(core->pc);
 }
 
 // Specific ROR for Memory Address:
 static inline void instr_ror(core_t *core, uint16_t (*addr_mode)(core_t *core)) {
+
 	uint16_t address = addr_mode(core);
-	uint8_t mem = core->ram[address];
 	uint8_t oldcarry = core->fcarry;
+
 	core->fcarry = (core->ram[address] & 0x01); // Carry = Bit 7
 	core->ram[address] = core->ram[address] >> 1;
 	core->ram[address] |= (oldcarry << 7);
 	set_fzero(core, &(core->ram[address]));
 	set_fsign(core, &(core->ram[address]));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", mem);
-		strcat(core->d_str, indir_val);
-	}
-#endif
+
 	++(core->pc);
 }
 
@@ -717,11 +522,6 @@ static inline void instr_rts(core_t *core) {
 	uint8_t msb = core->ram[CORE_STACK_ADDRESS(core, 0)];
 
 	core->pc = ((msb << 8) + lsb) + 1;
-	#if CORE_DEBUG == 1
-		printf("RTS LSB: %.2x\n", lsb);
-		printf("RTS MSB: %.2x\n", msb);
-		printf("RTS: PC Set to %.4x\n", core->pc);
-	#endif
 }
 
 // Specific ADC Funtion:
@@ -738,11 +538,6 @@ static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	// & (a ^ sum) == If the sign bits of a+b were different
 	// & 0x80 mask off the highest bit:
 	core->foverflow = (~(core->a ^ mem) & (core->a ^ sum) & 0x80) ? 1 : 0;
-		//#if CORE_NESTEST == 1
-		//if ( core->foverflow == 1 ) {
-			//printf("ADC OVERFLOW\n");
-		//}
-		//#endif
 
 	// Detect a uint8_t wraparound and set carry flag if appropriate
 	core->fcarry = core->a > UCHAR_MAX - (mem + core->fcarry);
@@ -752,13 +547,7 @@ static inline void instr_adc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	// Zero and Sign:
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", mem);
-		strcat(core->d_str, indir_val);
-	}
-#endif
+
 	++(core->pc);
 }
 
@@ -779,11 +568,6 @@ static inline void instr_sbc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	// & (a ^ sum) == If the sign bits of a+b were different
 	// & 0x80 mask off the highest bit:
 	core->foverflow = (~(core->a ^ mem) & (core->a ^ sum) & 0x80) ? 1 : 0;
-		//#if CORE_NESTEST == 1
-		//if ( core->foverflow == 1 ) {
-			//printf("ADC OVERFLOW\n");
-		//}
-		//#endif
 
 	// Detect a uint8_t wraparound and set carry flag if appropriate
 	core->fcarry = core->a > UCHAR_MAX - (mem + core->fcarry);
@@ -793,22 +577,15 @@ static inline void instr_sbc(core_t *core, uint16_t (*addr_mode)(core_t *core)) 
 	// Zero and Sign:
 	set_fzero(core, &(core->a));
 	set_fsign(core, &(core->a));
-#if CORE_NESTEST == 1
-	if (addr_mode == addr_absolute) {
-		char indir_val[64];
-		sprintf(indir_val, " = %.2X", ~mem & 0xFF);
-		strcat(core->d_str, indir_val);
-	}
-#endif
+
 	++(core->pc);
 }
 
 // Branches:
 static inline void instr_bcc(core_t *core) {
+
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	#if CORE_NESTEST == 1
-	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
-	#endif
+
 	if (core->fcarry == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -819,10 +596,9 @@ static inline void instr_bcc(core_t *core) {
 	}
 }
 static inline void instr_bcs(core_t *core) {
+
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	#if CORE_NESTEST == 1
-	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
-	#endif
+
 	if (core->fcarry == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -833,10 +609,9 @@ static inline void instr_bcs(core_t *core) {
 	}
 }
 static inline void instr_bne(core_t *core) {
+
 	int8_t rel = (int8_t)(core->ram[addr_immediate(core)]);
-	#if CORE_NESTEST == 1
-	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
-	#endif
+
 	if (core->fzero == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -847,10 +622,9 @@ static inline void instr_bne(core_t *core) {
 	}
 }
 static inline void instr_beq(core_t *core) {
+
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	#if CORE_NESTEST == 1
-	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
-	#endif
+
 	if (core->fzero == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -861,10 +635,8 @@ static inline void instr_beq(core_t *core) {
 	}
 }
 static inline void instr_bpl(core_t *core) {
+
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	#if CORE_NESTEST == 1
-	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
-	#endif
 	if (core->fsign == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -875,10 +647,9 @@ static inline void instr_bpl(core_t *core) {
 	}
 }
 static inline void instr_bmi(core_t *core) {
+
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	#if CORE_NESTEST == 1
-	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
-	#endif
+
 	if (core->fsign == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -889,10 +660,9 @@ static inline void instr_bmi(core_t *core) {
 	}
 }
 static inline void instr_bvc(core_t *core) {
+
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	#if CORE_NESTEST == 1
-	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
-	#endif
+
 	if (core->foverflow == 0 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -903,10 +673,9 @@ static inline void instr_bvc(core_t *core) {
 	}
 }
 static inline void instr_bvs(core_t *core) {
+
 	int8_t rel = (int8_t)core->ram[addr_immediate(core)];
-	#if CORE_NESTEST == 1
-	sprintf(core->d_str, "$%.4X", core->pc + rel + 1);
-	#endif
+
 	if (core->foverflow == 1 ) {
 		if ( ((core->pc + rel + 1) & 0xFF00) != (core->pc & 0xFF00) )
 			++(core->cyclecount);
@@ -946,10 +715,6 @@ void instr_brk(core_t *core) {
 
 	// Load our Interrupt handler and set our PC to that value
 	core->pc = (uint16_t)(core->ram[CORE_IRQ_HI] << 8) + core->ram[CORE_IRQ_LO];
-
-	#if CORE_DEBUG == 1
-	printf("BRK, PC is now %.4x\n", core->pc);
-	#endif
 }
 
 void instr_rti(core_t *core) {
@@ -985,10 +750,6 @@ void do_irq(core_t *core) {
 	
 	// No increment of PC
 
-	#if CORE_DEBUG == 1
-		printf("HW INTERRUPT!\n");
-	#endif
-
 	// Push MSB of PC onto Stack:
 	core->ram[CORE_STACK_ADDRESS(core, 0)] = (core->pc >> 8);
 	--(core->sp);
@@ -1020,11 +781,6 @@ void do_irq(core_t *core) {
 
 void do_nmi(core_t *core) {
 	
-	// No increment of PC
-	#if CORE_DEBUG == 1
-		printf("NMI INTERRUPT!\n");
-	#endif
-
 	// Push MSB of PC onto Stack:
 	core->ram[CORE_STACK_ADDRESS(core, 0)] = (core->pc >> 8);
 	--(core->sp);
@@ -1067,17 +823,13 @@ void step_core(core_t *core) {
 		case interruptnmi:
 			do_nmi(core);
 			core->interruptstate = interruptnone;
-			#if CORE_DEBUG == 1
-			printf("NMI FINISHED!\n");
-			#endif
+
 			return;
 
 		case interruptirq:
 			do_irq(core);
 			core->interruptstate = interruptnone;
-			#if CORE_DEBUG == 1
-			printf("HW INTERRUPT FINISHED!\n");
-			#endif
+
 			return;
 
 		default:
@@ -1087,28 +839,6 @@ void step_core(core_t *core) {
 
 	// Fetch:
 	opcode = core->ram[core->pc];
-
-	#if CORE_NESTEST == 1
-		core->d_op = opcode;
-		core->d_pc = core->pc;
-
-		core->d_a = core->a;
-		core->d_x = core->x;
-		core->d_y = core->y;
-
-		core->d_sp = core->sp;
-
-		core->d_p |= (core->fcarry 		<< 0);
-		core->d_p |= (core->fzero 		<< 1);
-		core->d_p |= (core->fintdisable 	<< 2);
-		core->d_p |= (core->fdec 		<< 3);
-		core->d_p |= (core->fvect	 	<< 4); // Set Bit 4
-		core->d_p |= (core->falways		<< 5);
-		core->d_p |= (core->foverflow 		<< 6);
-		core->d_p |= (core->fsign		<< 7);
-
-		core->d_pc = core->pc;
-	#endif	
 
 	core->cyclecount += core->ticktable[core->ram[core->pc]];
 
@@ -1646,144 +1376,66 @@ void step_core(core_t *core) {
 	// Catch our Unofficial NOPs:
 	
 		case NOP_3_1:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-			core->d_op2_en = 1;
-			core->d_op2 = core->ram[core->pc + 2];
-#endif
 			core->pc += 3;
 			break;
 
 		case NOP_3_2:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-			core->d_op2_en = 1;
-			core->d_op2 = core->ram[core->pc + 2];
-#endif
 			core->pc += 3;
 			break;
 
 		case NOP_3_3:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-			core->d_op2_en = 1;
-			core->d_op2 = core->ram[core->pc + 2];
-#endif
 			core->pc += 3;
 			break;
 
 		case NOP_3_4:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-			core->d_op2_en = 1;
-			core->d_op2 = core->ram[core->pc + 2];
-#endif
 			core->pc += 3;
 			break;
 
 		case NOP_3_5:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-			core->d_op2_en = 1;
-			core->d_op2 = core->ram[core->pc + 2];
-#endif
 			core->pc += 3;
 			break;
 
 		case NOP_3_6:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-			core->d_op2_en = 1;
-			core->d_op2 = core->ram[core->pc + 2];
-#endif
 			core->pc += 3;
 			break;
 
 		case NOP_3_7:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-			core->d_op2_en = 1;
-			core->d_op2 = core->ram[core->pc + 2];
-#endif
 			core->pc += 3;
 			break;
 
 		case NOP_2_1:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-#endif
 			core->pc += 2;
 			break;
 
 		case NOP_2_2:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-#endif
 			core->pc += 2;
 			break;
 
 		case NOP_2_3:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-#endif
 			core->pc += 2;
 			break;
 
 		case NOP_2_4:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-#endif
 			core->pc += 2;
 			break;
 
 		case NOP_2_5:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-#endif
 			core->pc += 2;
 			break;
 
 		case NOP_2_6:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-#endif
 			core->pc += 2;
 			break;
 
 		case NOP_2_7:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-#endif
 			core->pc += 2;
 			break;
 
 		case NOP_2_8:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-#endif
 			core->pc += 2;
 			break;
 
 		case NOP_2_9:
-#if CORE_NESTEST == 1
-			core->d_op1_en = 1;
-			core->d_op1 = core->ram[core->pc + 1];
-#endif
 			core->pc += 2;
 			break;
 

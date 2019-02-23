@@ -9,10 +9,7 @@
 #include <unistd.h>
 
 // Debug Macros:
-#define CORE_DEBUG 0
 #define CORE_DEBUG_TIMING 0
-
-#define CORE_NESTEST 1
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)  \

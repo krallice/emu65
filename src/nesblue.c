@@ -1,7 +1,5 @@
 #include "nesblue.h"
 
-#define DEBUG_NESBLUE 2
-
 #define NESBLUE_CPU_FREQ 2e6 // 2 Mhz
 //#define NESBLUE_CPU_FREQ 100 // 100 Hz 
 #define STEP_DURATION 10e6 // 10 ms
@@ -120,15 +118,8 @@ void load_functional_test(nes_t *nes) {
 	// Read one byte at a time:
 	uint16_t i = 0;
 	while ( fread( &(core->ram[i]), 1, 1, fp) ) {
-		#if DEBUG_NESBLUE == 1
-		printf("Read Byte: %.2x\n", core->ram[i]);
-		#endif
 		++i;
 	}
-	#if DEBUG_NESBLUE == 1
-		printf("Done Reading File, Read %d Bytes\n", i);
-		printf("Filled up to Memory Address %.4x\n", i);
-	#endif
 
 	// Set our PC to the start of the functional test:
 	core->pc = 0x0400;
