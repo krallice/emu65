@@ -1,10 +1,5 @@
 #include "emu65.h"
 
-#define NESBLUE_CPU_FREQ 2e6 // 2 Mhz
-//#define NESBLUE_CPU_FREQ 100 // 100 Hz 
-#define STEP_DURATION 10e6 // 10 ms
-#define ONE_SECOND 1e9
-
 char nestestnames[256][4] = {
     //FUT represents unimplemented op codes
     "BRK", "ORA", "NOP", "NOP", "NOP", "ORA", "ASL", "NOP",
@@ -59,18 +54,18 @@ nes_t *init_nes() {
 	return nes;
 }
 
-// Sleep for STEP_DURATION nanoseconds:
+// Sleep for EMU65_STEP_DURATION nanoseconds:
 void nes_sleep(void) {
         struct timespec req, rem;
         req.tv_sec = 0;
-        req.tv_nsec = STEP_DURATION;
+        req.tv_nsec = EMU65_STEP_DURATION;
         nanosleep(&req, &rem);
 }
 
 void execute_nes(nes_t *nes) {
 
-	// Evenly spread cycles over the period of a second to achieve NESBLUE_CPU_FREQ:
-        uint16_t cycles_per_step = (NESBLUE_CPU_FREQ / (ONE_SECOND / STEP_DURATION));
+	// Evenly spread cycles over the period of a second to achieve EMU65_CPU_FREQ:
+        uint16_t cycles_per_step = (EMU65_CPU_FREQ / (ONE_SECOND / EMU65_STEP_DURATION));
 	uint16_t total_cycles = 0;
 
         while (1) {
@@ -89,8 +84,8 @@ void execute_nes(nes_t *nes) {
 
 void run_functional_test(nes_t *nes) {
 
-	// Evenly spread cycles over the period of a second to achieve NESBLUE_CPU_FREQ:
-        uint16_t cycles_per_step = (NESBLUE_CPU_FREQ / (ONE_SECOND / STEP_DURATION));
+	// Evenly spread cycles over the period of a second to achieve EMU65_CPU_FREQ:
+        uint16_t cycles_per_step = (EMU65_CPU_FREQ / (ONE_SECOND / EMU65_STEP_DURATION));
 	uint16_t total_cycles = 0;
 
         while (1) {
@@ -186,8 +181,8 @@ void reset_nestest_diag(nes_t *nes) {
 
 void run_nestest(nes_t *nes) {
 
-	// Evenly spread cycles over the period of a second to achieve NESBLUE_CPU_FREQ:
-        uint16_t cycles_per_step = (NESBLUE_CPU_FREQ / (ONE_SECOND / STEP_DURATION));
+	// Evenly spread cycles over the period of a second to achieve EMU65_CPU_FREQ:
+        uint16_t cycles_per_step = (EMU65_CPU_FREQ / (ONE_SECOND / EMU65_STEP_DURATION));
 	uint16_t total_cycles = 0;
 	
 	core_t *core = nes->core;
