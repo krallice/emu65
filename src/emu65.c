@@ -1,4 +1,4 @@
-#include "nesblue.h"
+#include "emu65.h"
 
 #define NESBLUE_CPU_FREQ 2e6 // 2 Mhz
 //#define NESBLUE_CPU_FREQ 100 // 100 Hz 
