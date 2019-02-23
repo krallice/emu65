@@ -336,4 +336,5 @@ core_t *init_core(void);
 const uint8_t *init_cycle_table(core_t *core);
 void dump_core_state(core_t *core);
 void step_core(core_t *core);
+
 #endif

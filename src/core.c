@@ -1,4 +1,5 @@
 #include "core.h"
+#include "callbacks.h"
 
 // Memory Addressing Modes:
 // Each have a difference method of returning a 16bit Memory Address:
@@ -217,11 +218,20 @@ static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(co
 }
 
 // Generic Store Function:
-static inline void instr_st(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+//static inline void instr_st(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core), void (*write_callback_funcp)(const core_t *core, uint16_t addr)) {
+static inline void instr_st(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core), void (*write_callback_funcp)(const core_t *core, const uint16_t addr)) {
 
 	uint16_t addy = addr_mode(core);
-
 	core->ram[addy] = *reg;
+
+	//if ( addy == 0xF001 ) {
+		//printf("%c", core->ram[addy]);
+		//fflush(stdout);
+	//}
+
+	// Callback in the event that we want to immediately hook/capture into the value written:
+	write_callback_funcp(core, addy);
+
 	++(core->pc);
 }
 
@@ -919,47 +929,47 @@ void step_core(core_t *core) {
 
 		// STA:
 		case STA_ZPG:
-			instr_st(core, &(core->a), addr_zeropage);
+			instr_st(core, &(core->a), addr_zeropage, emu65_write_callback);
 			break;
 		case STA_ZPG_X:
-			instr_st(core, &(core->a), addr_zeropage_x);
+			instr_st(core, &(core->a), addr_zeropage_x, emu65_write_callback);
 			break;
 		case STA_A:
-			instr_st(core, &(core->a), addr_absolute);
+			instr_st(core, &(core->a), addr_absolute, emu65_write_callback);
 			break;
 		case STA_A_X:
-			instr_st(core, &(core->a), addr_absolute_x);
+			instr_st(core, &(core->a), addr_absolute_x, emu65_write_callback);
 			break;
 		case STA_A_Y:
-			instr_st(core, &(core->a), addr_absolute_y);
+			instr_st(core, &(core->a), addr_absolute_y, emu65_write_callback);
 			break;
 		case STA_IND_X:
-			instr_st(core, &(core->a), addr_indirect_x);
+			instr_st(core, &(core->a), addr_indirect_x, emu65_write_callback);
 			break;
 		case STA_IND_Y:
-			instr_st(core, &(core->a), addr_indirect_y);
+			instr_st(core, &(core->a), addr_indirect_y, emu65_write_callback);
 			break;
 
 		// STX:
 		case STX_ZPG:
-			instr_st(core, &(core->x), addr_zeropage);
+			instr_st(core, &(core->x), addr_zeropage, emu65_write_callback);
 			break;
 		case STX_ZPG_Y:
-			instr_st(core, &(core->x), addr_zeropage_y);
+			instr_st(core, &(core->x), addr_zeropage_y, emu65_write_callback);
 			break;
 		case STX_A:
-			instr_st(core, &(core->x), addr_absolute);
+			instr_st(core, &(core->x), addr_absolute, emu65_write_callback);
 			break;
 
 		// STY:
 		case STY_ZPG:
-			instr_st(core, &(core->y), addr_zeropage);
+			instr_st(core, &(core->y), addr_zeropage, emu65_write_callback);
 			break;
 		case STY_ZPG_X:
-			instr_st(core, &(core->y), addr_zeropage_x);
+			instr_st(core, &(core->y), addr_zeropage_x, emu65_write_callback);
 			break;
 		case STY_A:
-			instr_st(core, &(core->y), addr_absolute);
+			instr_st(core, &(core->y), addr_absolute, emu65_write_callback);
 			break;
 
 	// Register Transfers:

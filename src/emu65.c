@@ -1,5 +1,15 @@
 #include "emu65.h"
 
+// Callback triggered through every write to memory
+// Header defined in callbacks.h:
+void emu65_write_callback(const core_t *core, const uint16_t addy) {
+	if ( addy == EMU65_WRITE_ADDR ) {
+		printf("%c", core->ram[addy]);
+		fflush(stdout);
+	}
+	return;
+}
+
 // Init our machine structure:
 static machine_t *init_machine() {
 
@@ -30,24 +40,17 @@ static void run_machine(machine_t *machine) {
 	long total_cycles = 0;
         int cycles_per_step = (EMU65_CPU_FREQ / (ONE_SECOND / EMU65_STEP_DURATION));
 
-	// machine->core->pc = ( (machine->core->ram[0xFFFC] << 8) + machine->core->ram[0xFFFD]);
+	// Load our PC:
 	machine->core->pc = ( (machine->core->ram[0xFFFD] << 8) + machine->core->ram[0xFFFC]);
-	printf("PC is 0x%04X.\n", machine->core->pc);
+	printf("PC is 0x%04X. Staring Program Execution.\n", machine->core->pc);
 
+	// Execute:
 	while (1) {
-
-		//printf("Cycles per step: %d.\n", cycles_per_step);
 		for ( total_cycles %= cycles_per_step; total_cycles < cycles_per_step; ) {
 			step_core(machine->core);
 			total_cycles += machine->core->cyclecount;
-			//printf("Total Cycles: %ld\n", total_cycles);
 
 		}
-			// If our write byte has changed:
-			//if ( machine->core->ram[write_addr] != write_val ) {
-				//printf("%0x2X ", machine->core->ram[write_addr]);
-				//write_val = machine->core->ram[write_addr];
-			//}
 		machine_sleep();
 	}
 }

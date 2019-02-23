@@ -17,6 +17,8 @@
 #define EMU65_STEP_DURATION 10e6 // 10 ms
 #define ONE_SECOND 1e9
 
+#define EMU65_WRITE_ADDR 0xF001
+
 typedef struct machine_t {
 	core_t *core;
 } machine_t;
