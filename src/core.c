@@ -207,17 +207,15 @@ static inline void set_foverflow(core_t *core, uint8_t *a, uint8_t *b, uint8_t *
 // Generic Instruction Implementations:
 
 // Generic Load Function:
-static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
+static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core), void (*read_callback_funcp)(const core_t *core, const uint16_t addr)) {
 
 	uint16_t addy = addr_mode(core);
 	*reg = core->ram[addy];
 	set_fzero(core, reg);
 	set_fsign(core, reg);
 
-	if (addy == 0xF004) {
-		if (core->ram[addy] != 0x00) {
-			core->ram[addy] = 0x00;
-		}
+	if ( read_callback_funcp != NULL ) {
+		read_callback_funcp(core, addy);
 	}
 
 	++(core->pc);
@@ -236,7 +234,9 @@ static inline void instr_st(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(co
 	//}
 
 	// Callback in the event that we want to immediately hook/capture into the value written:
-	write_callback_funcp(core, addy);
+	if ( write_callback_funcp != NULL ) {
+		write_callback_funcp(core, addy);
+	}
 
 	++(core->pc);
 }
@@ -865,67 +865,67 @@ void step_core(core_t *core) {
 
 		// LDX:
 		case LDX_I:
-			instr_ld(core, &(core->x), addr_immediate);
+			instr_ld(core, &(core->x), addr_immediate, emu65_read_callback);
 			break;
 		case LDX_ZPG:
-			instr_ld(core, &(core->x), addr_zeropage);
+			instr_ld(core, &(core->x), addr_zeropage, emu65_read_callback);
 			break;
 		case LDX_ZPG_Y:
-			instr_ld(core, &(core->x), addr_zeropage_y);
+			instr_ld(core, &(core->x), addr_zeropage_y, emu65_read_callback);
 			break;
 		case LDX_A:
-			instr_ld(core, &(core->x), addr_absolute);
+			instr_ld(core, &(core->x), addr_absolute, emu65_read_callback);
 			break;
 		case LDX_A_Y:
 			core->checkpageboundary = 1;
-			instr_ld(core, &(core->x), addr_absolute_y);
+			instr_ld(core, &(core->x), addr_absolute_y, emu65_read_callback);
 			break;
 
 		// LDY:
 		case LDY_I:
-			instr_ld(core, &(core->y), addr_immediate);
+			instr_ld(core, &(core->y), addr_immediate, emu65_read_callback);
 			break;
 		case LDY_ZPG:
-			instr_ld(core, &(core->y), addr_zeropage);
+			instr_ld(core, &(core->y), addr_zeropage, emu65_read_callback);
 			break;
 		case LDY_ZPG_X:
-			instr_ld(core, &(core->y), addr_zeropage_x);
+			instr_ld(core, &(core->y), addr_zeropage_x, emu65_read_callback);
 			break;
 		case LDY_A:
-			instr_ld(core, &(core->y), addr_absolute);
+			instr_ld(core, &(core->y), addr_absolute, emu65_read_callback);
 			break;
 		case LDY_A_X:
 			core->checkpageboundary = 1;
-			instr_ld(core, &(core->y), addr_absolute_x);
+			instr_ld(core, &(core->y), addr_absolute_x, emu65_read_callback);
 			break;
 
 		// LDA:
 		case LDA_I:
-			instr_ld(core, &(core->a), addr_immediate);
+			instr_ld(core, &(core->a), addr_immediate, emu65_read_callback);
 			break;
 		case LDA_ZPG:
-			instr_ld(core, &(core->a), addr_zeropage);
+			instr_ld(core, &(core->a), addr_zeropage, emu65_read_callback);
 			break;
 		case LDA_ZPG_X:
-			instr_ld(core, &(core->a), addr_zeropage_x);
+			instr_ld(core, &(core->a), addr_zeropage_x, emu65_read_callback);
 			break;
 		case LDA_A:
-			instr_ld(core, &(core->a), addr_absolute);
+			instr_ld(core, &(core->a), addr_absolute, emu65_read_callback);
 			break;
 		case LDA_A_X:
 			core->checkpageboundary = 1;
-			instr_ld(core, &(core->a), addr_absolute_x);
+			instr_ld(core, &(core->a), addr_absolute_x, emu65_read_callback);
 			break;
 		case LDA_A_Y:
 			core->checkpageboundary = 1;
-			instr_ld(core, &(core->a), addr_absolute_y);
+			instr_ld(core, &(core->a), addr_absolute_y, emu65_read_callback);
 			break;
 		case LDA_IND_X:
-			instr_ld(core, &(core->a), addr_indirect_x);
+			instr_ld(core, &(core->a), addr_indirect_x, emu65_read_callback);
 			break;
 		case LDA_IND_Y:
 			core->checkpageboundary = 1;
-			instr_ld(core, &(core->a), addr_indirect_y);
+			instr_ld(core, &(core->a), addr_indirect_y, emu65_read_callback);
 			break;
 
 		// STA:

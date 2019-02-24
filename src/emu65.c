@@ -13,6 +13,16 @@ void emu65_write_callback(const core_t *core, const uint16_t addy) {
 	return;
 }
 
+// Callback triggered on every read from memory:
+void emu65_read_callback(const core_t *core, const uint16_t addy) {
+	if ( addy == EMU65_READ_ADDR ) {
+		if (core->ram[EMU65_READ_ADDR] != 0x00) {
+			core->ram[EMU65_READ_ADDR] = 0x00;
+		}
+	}
+	return;
+}
+
 // Read our input from terminal:
 static int read_kb_input(void) {
 
