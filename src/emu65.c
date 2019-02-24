@@ -1,5 +1,8 @@
 #include "emu65.h"
 
+struct termios term_original_attributes;
+struct termios term_read_attributes;
+
 // Callback triggered through every write to memory
 // Header defined in callbacks.h:
 void emu65_write_callback(const core_t *core, const uint16_t addy) {
@@ -8,6 +11,32 @@ void emu65_write_callback(const core_t *core, const uint16_t addy) {
 		fflush(stdout);
 	}
 	return;
+}
+
+// Read our input from terminal:
+static int read_kb_input(void) {
+
+    int character;
+
+    // Set the terminal to RAW mode:
+    // Copy orignal attributes across:
+    memcpy(&term_read_attributes, &term_original_attributes, sizeof(struct termios));
+
+    term_read_attributes.c_lflag &= ~(ICANON);
+    term_read_attributes.c_lflag &= ~(ECHO);
+    term_read_attributes.c_cc[VTIME] = 0;
+    term_read_attributes.c_cc[VMIN] = 0;
+    tcsetattr(fileno(stdin), TCSANOW, &term_read_attributes);
+
+    // Do not block, attempt to read from the input STDIN stream.
+    // Return -1 if there is no character available:
+    character = fgetc(stdin);
+
+    // Restore:
+    tcsetattr(fileno(stdin), TCSANOW, &term_original_attributes);
+
+    // Return our read character from the input stream:
+    return character;
 }
 
 // Init our machine structure:
@@ -40,16 +69,28 @@ static void run_machine(machine_t *machine) {
 	long total_cycles = 0;
         int cycles_per_step = (EMU65_CPU_FREQ / (ONE_SECOND / EMU65_STEP_DURATION));
 
+	int input_char = -1;
+
 	// Load our PC:
 	machine->core->pc = ( (machine->core->ram[0xFFFD] << 8) + machine->core->ram[0xFFFC]);
 	printf("PC is 0x%04X. Staring Program Execution.\n", machine->core->pc);
 
 	// Execute:
 	while (1) {
+		
+		// Attempt to capture input if possible:
+		if ((input_char = read_kb_input()) != -1) {
+			machine->core->ram[EMU65_READ_ADDR] = input_char;
+		}
+
 		for ( total_cycles %= cycles_per_step; total_cycles < cycles_per_step; ) {
+			// Execute:
 			step_core(machine->core);
 			total_cycles += machine->core->cyclecount;
-
+			// Reset memory value if we previously entered something:
+			//if (input_char != -1) {
+				//machine->core->ram[EMU65_READ_ADDR] = 0;
+			//}
 		}
 		machine_sleep();
 	}
@@ -82,7 +123,16 @@ static int load_basic_rom(machine_t *machine) {
 	return 0;
 }
 
+// Save our original terminal attributes (with echo disabled):
+static inline void save_original_terminal_attributes(void) {
+	tcgetattr(fileno(stdin), &term_original_attributes);
+	term_original_attributes.c_lflag &= ~ECHO;
+	tcsetattr(fileno(stdin), TCSANOW, &term_original_attributes);
+}
+
 int main(void) {
+
+	save_original_terminal_attributes();
 
 	// Create our machine object:
 	machine_t *machine = init_machine();

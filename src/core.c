@@ -210,10 +210,16 @@ static inline void set_foverflow(core_t *core, uint8_t *a, uint8_t *b, uint8_t *
 static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(core_t *core)) {
 
 	uint16_t addy = addr_mode(core);
-
 	*reg = core->ram[addy];
 	set_fzero(core, reg);
 	set_fsign(core, reg);
+
+	if (addy == 0xF004) {
+		if (core->ram[addy] != 0) {
+			core->ram[addy] = 0;
+		}
+	}
+
 	++(core->pc);
 }
 

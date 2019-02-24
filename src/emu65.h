@@ -18,6 +18,7 @@
 #define ONE_SECOND 1e9
 
 #define EMU65_WRITE_ADDR 0xF001
+#define EMU65_READ_ADDR 0xF004
 
 typedef struct machine_t {
 	core_t *core;
