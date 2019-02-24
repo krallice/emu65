@@ -55,7 +55,7 @@ static machine_t *init_machine() {
 // Sleep for EMU65_STEP_DURATION nanoseconds:
 static void machine_sleep(void) {
 
-        struct timespec req, rem;
+        static struct timespec req, rem;
 
         req.tv_sec = 0;
         req.tv_nsec = EMU65_STEP_DURATION;
