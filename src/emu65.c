@@ -73,7 +73,6 @@ static void run_machine(machine_t *machine) {
 	int input_char = -1;
 
 	// Load our PC:
-	machine->core->pc = ( (machine->core->ram[0xFFFD] << 8) + machine->core->ram[0xFFFC]);
 	printf("PC is 0x%04X. Staring Program Execution.\n", machine->core->pc);
 
 	// Execute:
@@ -114,7 +113,7 @@ static int load_basic_rom(machine_t *machine) {
 	}
 
 	printf("Loaded 0x%04X (%d) Bytes into RAM.\n", loaded, loaded);
-	core->pc = start_load_address;
+	core->pc = ( (core->ram[0xFFFD] << 8) + core->ram[0xFFFC]);
 	fclose(fp);
 	return 0;
 }
