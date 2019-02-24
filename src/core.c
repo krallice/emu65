@@ -215,8 +215,8 @@ static inline void instr_ld(core_t *core, uint8_t *reg, uint16_t (*addr_mode)(co
 	set_fsign(core, reg);
 
 	if (addy == 0xF004) {
-		if (core->ram[addy] != 0) {
-			core->ram[addy] = 0;
+		if (core->ram[addy] != 0x00) {
+			core->ram[addy] = 0x00;
 		}
 	}
 
@@ -839,19 +839,14 @@ void step_core(core_t *core) {
 		case interruptnmi:
 			do_nmi(core);
 			core->interruptstate = interruptnone;
-
 			return;
-
 		case interruptirq:
 			do_irq(core);
 			core->interruptstate = interruptnone;
-
 			return;
-
 		default:
 			break;
 	}
-
 
 	// Fetch:
 	opcode = core->ram[core->pc];

@@ -80,6 +80,11 @@ static void run_machine(machine_t *machine) {
 
 		// Attempt to capture input if possible:
 		if ((input_char = read_kb_input()) != -1) {
+
+			// LineFeed to Carriage Return Translation:
+			if ( input_char == 0x0A ) {
+				input_char = 0x0D;
+			}
 			machine->core->ram[EMU65_READ_ADDR] = input_char;
 		}
 
