@@ -65,9 +65,10 @@ static void machine_sleep(void) {
 
 static void run_machine(machine_t *machine) {
 
-	// Evenly spread cycles over the period of a second to achieve EMU65_CPU_FREQ:
-	long total_cycles = 0;
-        int cycles_per_step = (EMU65_CPU_FREQ / (ONE_SECOND / EMU65_STEP_DURATION));
+	// Break our 1second up into steps of step_duration, and given each step,
+	// execute the vCPU cycles_per_step, which is our 1 second frequency (aka HZ)
+	// broken up into chunks of our step_duration:
+        long cycles_per_step = (EMU65_CPU_FREQ / (ONE_SECOND / EMU65_STEP_DURATION));
 
 	int input_char = -1;
 
@@ -77,20 +78,15 @@ static void run_machine(machine_t *machine) {
 
 	// Execute:
 	while (1) {
-		
+
 		// Attempt to capture input if possible:
 		if ((input_char = read_kb_input()) != -1) {
 			machine->core->ram[EMU65_READ_ADDR] = input_char;
 		}
 
-		for ( total_cycles %= cycles_per_step; total_cycles < cycles_per_step; ) {
+		for ( machine->core->cyclecount = machine->core->cyclecount % cycles_per_step; machine->core->cyclecount < cycles_per_step; ) {
 			// Execute:
 			step_core(machine->core);
-			total_cycles += machine->core->cyclecount;
-			// Reset memory value if we previously entered something:
-			//if (input_char != -1) {
-				//machine->core->ram[EMU65_READ_ADDR] = 0;
-			//}
 		}
 		machine_sleep();
 	}
