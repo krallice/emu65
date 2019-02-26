@@ -1,6 +1,7 @@
 # emu65
 6502 emulator running BASIC!
-This is a cycle accurate 6502 vCPU emulator, with supplied bootstrap code to load and run the Emulation Enhanced Basic ROM
+
+This is a cycle accurate 6502 vCPU emulator, with supplied bootstrap code to load and run the Emulation Enhanced Basic ROM. I tell you what, I was pretty damn excited when I first saw that EhBASIC boot line ...
 
 ```
 # bin/emu65 
